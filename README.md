@@ -34,9 +34,20 @@ At the prompt of a Claude Code session:
 
 Answer `y` to add the marketplace, then pick the user scope. It works from the next turn on.
 
+## Change the color
+
+Type it at the prompt; the band repaints at once and the choice is remembered:
+
+```
+/then color            → shows the current color and the list
+/then color violet     → blue, violet, green, amber, pink, cyan
+/then color #D97757    → any #RRGGBB
+/then color default    → back to the one in /config
+```
+
 ## Settings
 
-In `/config`, under the plugin:
+Everything else lives in `/config`, under the plugin (`/then color` wins over the color set here):
 
 | Option | Values | Default |
 |---|---|---|
@@ -46,7 +57,23 @@ In `/config`, under the plugin:
 
 Every palette color keeps white text at 5:1 contrast or better; a light custom color gets dark text instead.
 
-`/then` turns it off and on (remembered across sessions).
+`/then` turns it off and on (`/then on`, `/then off`); both are remembered across sessions.
+
+## What it costs
+
+Then runs on your machine and calls no model of its own. What it spends is Claude's own tokens, measured on a real session (20 turns with options):
+
+| What | When | Tokens |
+|---|---|---|
+| Its rule in the system prompt | every request, cached after the first | ~245 |
+| The `offer` tool's definition | every request, cached after the first | ~295 |
+| Claude writing the 4 options | once per turn, output | ~145 |
+| The band's answer to Claude | once per turn, input | ~35 |
+| Your pick, sent along with your message | when you pick | ~35 |
+
+The one cost worth knowing: since the options are a tool call, each turn has **one extra step** after it, and that step re-reads the conversation from the prompt cache (billed at a tenth of the input price). In a 40k-token conversation that is about the price of 4k fresh input tokens per turn, plus ~145 output tokens. If Claude forgets the options after real work, the mod asks once, which costs one more such step.
+
+`/then off` removes all of it: no rule, no tool call, no extra step.
 
 ## How it works
 
@@ -79,7 +106,27 @@ Responde `y` para agregar el mercado y elige el alcance de usuario.
 
 ### Ajustes
 
-En `/config`: idioma (`auto`, `español`, `english`), color de la banda (`blue`, `violet`, `green`, `amber`, `pink`, `cyan`, `custom`) y color personalizado (`#RRGGBB`). `/then` lo apaga y lo prende.
+**Cambiar el color**, escribiéndolo en el prompt (se ve al instante y se recuerda):
+
+```
+/then color            → muestra el color actual y la lista
+/then color violeta    → azul, violeta, verde, ámbar, rosa, cian
+/then color #D97757    → cualquier #RRGGBB
+/then color normal     → vuelve al de /config
+```
+
+En `/config` están el idioma (`auto`, `español`, `english`) y el color por defecto. `/then` lo apaga y lo prende (`/then on`, `/then off`).
+
+### Cuánto consume
+
+Then corre en tu máquina y no llama a ningún modelo propio. Gasta tokens de Claude, medidos en una sesión real:
+
+- **Fijo, en el prompt de sistema:** ~540 tokens (la regla y la herramienta). Quedan en caché después de la primera petición.
+- **Por turno:** ~145 tokens de salida (Claude escribiendo las 4 opciones) y ~35 de entrada (la respuesta de la banda).
+- **Lo que más pesa:** como las opciones son una llamada a herramienta, cada turno tiene **un paso extra** que vuelve a leer la conversación desde la caché (cobrada a una décima del precio de entrada). En una conversación de 40k tokens equivale a unos 4k tokens de entrada por turno.
+- Si Claude olvida las opciones después de trabajar, el mod le pide una vez que las ponga: un paso extra más.
+
+`/then off` lo quita todo: sin regla, sin herramienta, sin paso extra.
 
 ## License
 

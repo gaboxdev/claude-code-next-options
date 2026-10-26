@@ -6,6 +6,9 @@ import type { Offer, Option, Usage } from '../types'
 const TOOL = 'mcp__then__offer'
 const offer = atom({ plugin: 'then', key: 'offer' } as const, null)
 const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
+// the colour `/then color …` picked: a palette name or a #RRGGBB; null keeps the one in /config
+const color = atom({ plugin: 'then', key: 'color' } as const, null)
+const STORE_COLOR = 'color'
 const STORE_ON = 'isOn'
 const COUNT = 4
 // the band's own last row: none of the four, the person writes what they want
@@ -16,6 +19,8 @@ const FREE = COUNT + 1
 type Words = {
   title: string; hint: string; hintFree: string; badge: string; column: string; usage: Record<Usage, string>
   free: string; freeDetail: string; writing: string; writingDetail: string; option: string; off: string; on: string; command: string
+  argumentHint: string; help: string; colors: Record<string, string>
+  colorList: (current: string) => string; colorSet: (name: string) => string; colorBad: (arg: string) => string; colorReset: string
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
   es: {
@@ -24,7 +29,14 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     free: 'Otra cosa (libre)', freeDetail: 'ninguna de estas: escribe lo que quieras',
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
     off: 'Then apagado. /then lo prende de nuevo.', on: 'Then prendido: al final de cada turno vas a ver 4 opciones para elegir con un número.',
-    command: 'Prender o apagar las opciones al final de cada turno',
+    command: 'Prender o apagar las opciones al final de cada turno, o cambiar su color',
+    argumentHint: '[color <nombre|#RRGGBB>] | on | off',
+    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757',
+    colors: { blue: 'azul', violet: 'violeta', green: 'verde', amber: 'ámbar', pink: 'rosa', cyan: 'cian' },
+    colorList: c => `Color de Then: ${c}. Para cambiarlo: /then color azul | violeta | verde | ámbar | rosa | cian, o /then color #RRGGBB (por ejemplo #D97757). /then color normal vuelve al de /config.`,
+    colorSet: c => `Then ahora es ${c}. La banda ya se dibuja con ese color.`,
+    colorBad: a => `No conozco el color «${a}». Usa azul, violeta, verde, ámbar, rosa, cian o un #RRGGBB.`,
+    colorReset: 'Then vuelve al color de /config.',
   },
   en: {
     title: 'What next?', hint: 'type the number · or "2 and 4" + Enter', hintFree: 'type your request and Enter',
@@ -32,7 +44,14 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     free: 'Something else', freeDetail: 'none of these: type your own',
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
     off: 'Then is off. /then turns it back on.', on: 'Options on: each turn ends with 4 to pick by number.',
-    command: 'Turn the options at the end of each turn on or off',
+    command: 'Turn the options at the end of each turn on or off, or change their color',
+    argumentHint: '[color <name|#RRGGBB>] | on | off',
+    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757',
+    colors: { blue: 'blue', violet: 'violet', green: 'green', amber: 'amber', pink: 'pink', cyan: 'cyan' },
+    colorList: c => `Then is ${c}. To change it: /then color blue | violet | green | amber | pink | cyan, or /then color #RRGGBB (e.g. #D97757). /then color default goes back to /config.`,
+    colorSet: c => `Then is now ${c}. The band draws in it right away.`,
+    colorBad: a => `Unknown color "${a}". Use blue, violet, green, amber, pink, cyan or a #RRGGBB.`,
+    colorReset: 'Then is back to the color set in /config.',
   },
 }
 let T: Words = WORDS_BY.es
@@ -65,6 +84,21 @@ const relLum = (c: number[]) => {
   return 0.2126 * (l[0] ?? 0) + 0.7152 * (l[1] ?? 0) + 0.0722 * (l[2] ?? 0)
 }
 const contrast = (a: number[], b: number[]) => (Math.max(relLum(a), relLum(b)) + 0.05) / (Math.min(relLum(a), relLum(b)) + 0.05)
+
+// what `/then color …` accepts, in either language, to the palette's own names
+const COLOR_ALIASES: Record<string, string> = {
+  azul: 'blue', violeta: 'violet', morado: 'violet', purple: 'violet', verde: 'green', ámbar: 'amber', ambar: 'amber',
+  naranja: 'amber', orange: 'amber', rosa: 'pink', rosado: 'pink', cian: 'cyan', turquesa: 'cyan', teal: 'cyan',
+}
+// a colour the person typed after `/then color`: a palette name (either language) or a #RRGGBB; null when it is neither
+export function parseColor(arg: string): string | null {
+  const word = arg.trim().toLowerCase()
+  if (/^#?[0-9a-f]{6}$/.test(word)) return `#${word.replace('#', '')}`
+  const name = COLOR_ALIASES[word] ?? word
+  return PALETTE[name] ? name : null
+}
+// a stored choice as pickAccent takes it: a #RRGGBB is the custom colour
+const accentOf = (chosen: string) => (chosen.startsWith('#') ? pickAccent('custom', chosen) : pickAccent(chosen, null))
 
 // a palette name, or with «custom» the #RRGGBB the person wrote; anything unreadable keeps the blue
 export function pickAccent(name: unknown, custom: unknown): { accent: number[]; ink: string } {
@@ -194,6 +228,7 @@ async function pressPick($: EngineInterface, n: number) {
 
 export const register: Register = (on, options) => {
   const picked = pickAccent(options?.color, options?.customColor)
+  const configColor = options?.color === 'custom' ? String(options?.customColor ?? '') : String(options?.color ?? 'blue')
   languageSetting = String(options?.language ?? 'auto')
   ACCENT = picked.accent
   INK = picked.ink
@@ -244,7 +279,9 @@ export const register: Register = (on, options) => {
     })
     const rows = await $.config.list().catch(() => [])
     T = WORDS_BY[languageOf(languageSetting, rows.find(row => row.key === 'language')?.value)]
-    await $.command.register({ name: 'then', description: T.command })
+    await $.command.register({ name: 'then', description: T.command, argumentHint: T.argumentHint })
+    const storedColor = await $.store.get(STORE_COLOR)
+    if (typeof storedColor === 'string' && parseColor(storedColor)) await update($, color, () => storedColor)
     const stored = await $.store.get(STORE_ON)
     if (stored === false) await update($, isOn, () => false)
     const theme = rows.find(row => row.key === 'theme')
@@ -325,13 +362,34 @@ export const register: Register = (on, options) => {
     return { ...result, block: `then: call ${TOOL} with ${COUNT} options for how to continue, then end with one short line.` }
   })
 
-  on('command.run', { command: 'then' }, async $ => {
+  // `/then` turns it on or off; `/then on|off` says which; `/then color …` lists, sets or resets the band's colour
+  on('command.run', { command: 'then' }, async ($, e) => {
+    const [verb = '', ...rest] = e.args.trim().split(/\s+/)
+    const word = verb.toLowerCase()
+    const arg = rest.join(' ')
+    if (word === 'color' || word === 'colour' || word === 'colores') {
+      const current = (await read($, color)) ?? configColor
+      const nameOf = (c: string) => (c.startsWith('#') ? c : (T.colors[c] ?? c))
+      if (!arg) return { text: T.colorList(nameOf(current)) }
+      if (/^(normal|default|reset|config)$/i.test(arg)) {
+        await update($, color, () => null)
+        await $.store.delete(STORE_COLOR)
+        return { text: T.colorReset }
+      }
+      const chosen = parseColor(arg)
+      if (!chosen) return { text: T.colorBad(arg) }
+      await update($, color, () => chosen)
+      await $.store.set(STORE_COLOR, chosen)
+      return { text: T.colorSet(nameOf(chosen)) }
+    }
+    if (word && !/^(on|off|prender|apagar)$/.test(word)) return { text: T.help }
     const was = await read($, isOn)
-    await update($, isOn, () => !was)
-    await $.store.set(STORE_ON, !was)
-    if (was) await clear($)
+    const next = word ? /^(on|prender)$/.test(word) : !was
+    await update($, isOn, () => next)
+    await $.store.set(STORE_ON, next)
+    if (!next) await clear($)
 
-    return { text: was ? T.off : T.on }
+    return { text: next ? T.on : T.off }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -339,6 +397,11 @@ export const register: Register = (on, options) => {
     isBandShown = false
     if (!o || e.props.hasSurvey || e.props.isWorking || !(await read($, isOn))) return next(e)
     isBandShown = true
+    // the colour `/then color` picked wins over /config; reading it here redraws the band when it changes
+    const chosen = await read($, color)
+    const painted = chosen ? accentOf(chosen) : picked
+    ACCENT = painted.accent
+    INK = painted.ink
     const els = $.ui.resolve(e)
     const { Box, Button, Text } = els
     // the detail scrolls under the pointer where the surface runs a Client of ours (terminal, desktop); elsewhere it

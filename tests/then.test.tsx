@@ -202,3 +202,41 @@ test('the color option paints the band', { options: { color: 'custom', customCol
   expect((await ui.find({ type: 'Button', key: 'opcion-btn-5' }))?.text).toContain('Something else')
   await ui.unmount()
 })
+
+test('/then color changes the band at once, in either language', { options: { language: 'español' } }, async ($, on) => {
+  const stored: Record<string, unknown> = {}
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', (_, e) => {
+    stored[(e as { key: string }).key] = (e as { value: unknown }).value
+    return { value: undefined }
+  })
+  on('store.delete', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('tool.call', () => ({ result: 'engine' }))
+  on('command.run', () => ({ text: 'engine' }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
+  const run = (args: string) => $.command.run({ command: 'then', args } as never) as Promise<{ text: string }>
+
+  expect((await run('color')).text).toContain('Color de Then: azul')
+  expect((await run('color morado')).text).toContain('violeta')
+  expect(stored.color).toBe('violet')
+  const ui = await $.ui.mount(BAND as never)
+  const pill = await ui.find({ type: 'Text', text: /^ 1 $/ })
+  expect((pill as unknown as { props: { backgroundColor: string } }).props.backgroundColor).toBe('#7858ca')
+  await ui.unmount()
+  expect((await run('color #ffcc00')).text).toContain('#ffcc00')
+  expect((await run('color fucsia')).text).toContain('No conozco')
+  expect((await run('color normal')).text).toContain('/config')
+  expect((await run('lo que sea')).text).toContain('Uso: /then')
+})
