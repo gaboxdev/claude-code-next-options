@@ -350,7 +350,7 @@ test('+ picks several: the rows mark as the numbers are typed, Enter sends them 
   expect(draft).toBe('+4 2')
   expect(sent.length).toBe(0)
   const ui = await $.ui.mount(BAND as never)
-  expect(await ui.find({ type: 'Text', text: /varias: marca las casillas/ })).not.toBe(undefined)
+  expect(await ui.find({ type: 'Text', text: /marcando varias: sigue con los números/ })).not.toBe(undefined)
   expect((await ui.find({ type: 'Box', key: 'opcion-4' }))?.text).toContain('✓')
   expect((await ui.find({ type: 'Box', key: 'opcion-2' }))?.text).toContain('✓')
   expect((await ui.find({ type: 'Box', key: 'opcion-1' }))?.text).not.toContain('✓')
@@ -395,7 +395,7 @@ test('every option row has a box beside its number; ticking one starts picking s
   // rows 1 to 4 carry a box, the free row none
   for (const n of [1, 2, 3, 4]) expect(await ui.find({ type: 'Button', key: `casilla-${n}` })).not.toBe(undefined)
   expect(await ui.find({ type: 'Button', key: 'casilla-5' })).toBe(undefined)
-  expect(await ui.find({ type: 'Text', text: /casilla o \+ para varias/ })).not.toBe(undefined)
+  expect(await ui.find({ type: 'Text', text: /3 = elegir · \+1 3 = varias \+ Enter/ })).not.toBe(undefined)
   await ui.press({ key: 'casilla-2' } as never)
   expect(filled.at(-1)).toBe('+2')
   await ui.unmount()

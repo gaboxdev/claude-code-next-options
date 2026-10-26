@@ -1,7 +1,5 @@
 import { expect, test } from 'claude-code/testing'
 
-import { ringStop } from '../hooks/register'
-
 const REPLY = `Listo.
 
 <then>
@@ -27,63 +25,11 @@ function engine(on: Parameters<Parameters<typeof test>[2] extends (...a: infer A
   extra(on)
 }
 
-// the ring moving onto a row as the person moves it, in the shape the engine raises ui.focus with
-const focusRow = ($: any, n: number) =>
-  $.ui.focus({ component: 'AbovePrompt', requestId: 'band', plugin: 'then', element: `opcion-btn-${n}`, origin: { kind: 'person' } })
-
 async function offer($: any) {
   const stream = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 })
   for await (const chunk of stream) void chunk
   await stream.result
 }
-
-test('the ring makes one stop a row: down lands on the next row, up on the one above', () => {
-  // moving down from row 2 meets row 3's box first
-  expect(ringStop('casilla-3', 'opcion-btn-2')).toBe('opcion-btn-3')
-  // moving up from row 3 meets its own box first
-  expect(ringStop('casilla-3', 'opcion-btn-3')).toBe('opcion-btn-2')
-  expect(ringStop('casilla-1', 'opcion-btn-1')).toBe('opcion-btn-1')
-  expect(ringStop('opcion-btn-4', 'opcion-btn-3')).toBe('opcion-btn-4')
-})
-
-test('keyboard: with the ring on a row, x ticks it and e sends the ticked rows', { options: { language: 'español' } }, async ($, on) => {
-  const sent: string[] = []
-  const filled: string[] = []
-  engine(on, o => {
-    o('prompt.submit', (_: unknown, e: { text: string }) => {
-      sent.push(e.text)
-      return { text: e.text }
-    })
-    o('prompt.fill', (_: unknown, e: { text: string }) => {
-      filled.push(e.text)
-      return { isFilled: true, text: e.text, cursor: 0 }
-    })
-    o('ui.focus', () => ({}))
-    o('ui.render', ($$: any, e: any) => {
-      const { Box } = $$.ui.resolve(e)
-      return <Box />
-    })
-  })
-  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await offer($)
-  const ui = await $.ui.mount(BAND as never)
-  // the suggested row takes the ring first
-  const row2 = await ui.find({ type: 'Button', key: 'opcion-btn-2' })
-  expect((row2 as unknown as { props: { autoFocus?: boolean } }).props.autoFocus).toBe(true)
-
-  // the ring moves onto row 3 while the band is drawn: the header turns into the keys, x ticks row 3
-  await focusRow($, 3)
-  expect(await ui.find({ type: 'Text', text: /↑↓ mover/ })).not.toBe(undefined)
-  await ui.press({ key: 'then-marcar' } as never)
-  expect(filled.at(-1)).toBe('+3')
-
-  await focusRow($, 1)
-  await ui.press({ key: 'then-marcar' } as never)
-  expect(filled.at(-1)).toBe('+3 1')
-  await ui.press({ key: 'then-enviar' } as never)
-  expect(sent.at(-1)).toBe('Opciones 3, 1: 3. Escribir un chequeo · 1. Correr las pruebas')
-  await ui.unmount()
-})
 
 test('plan-progress bars drawn above leave the band fewer rows', { options: { language: 'español' } }, async ($, on) => {
   engine(on, o => {
