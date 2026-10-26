@@ -111,6 +111,20 @@ Everything stays local: Then makes **no network requests** and calls no model of
 - **Stored.** Your choices (on/off, sound, color, theme) and the last offer, in Claude Code's own store for the plugin.
 - **Files it writes and reads.** When a turn ends it writes the options to `~/.claude/then/<session>.offer.json` (`{"id": null}` when there are none), so an app beside the terminal can show them, and while they are up it reads `<session>.pick.json` every half second: a pick there with the same `id` is sent as a press on the band would. Onzatchy (the Mac notch) is one such app. The folder is the one beside your Claude Code transcripts.
 
+## Codex
+
+Codex's terminal has no band to draw, so Then comes to Codex as a **hook** that keeps the rest: the same rule, the same `<then>` block, a pick typed as `3` or `la 2 y la 4` + Enter, and the options in the mailbox (`~/.codex/then/<session>.offer.json`, with `"provider": "codex"`) for an app beside the terminal to draw. The block stays visible in Codex's transcript: nothing there can hide it. It needs Node 23.6 or newer. Add it to `~/.codex/hooks.json` (with `[features] hooks = true` in `config.toml`), the path pointing at your clone:
+
+```json
+{ "hooks": {
+  "SessionStart":     [{ "matcher": "startup|resume", "hooks": [{ "type": "command", "command": "node /path/to/then/codex/hook.ts" }] }],
+  "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node /path/to/then/codex/hook.ts" }] }],
+  "Stop":             [{ "hooks": [{ "type": "command", "command": "node /path/to/then/codex/hook.ts", "timeout": 30 }] }]
+} }
+```
+
+Codex runs a new hook only once you trust it. A turn that ends without options is sent back once, as in Claude Code; a question or an empty reply is not.
+
 ## How it works
 
 It is a Claude mod (a Claude Code hooks module). It adds one short rule to the system prompt asking Claude to end each reply with a `<then>` block of 4 lines (`n|title|detail|usage`, a `*` on the suggested one). The mod reads that block when the reply is in, hides it from the transcript (the stored message keeps it, so Claude knows what it offered) and draws the band above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
@@ -180,6 +194,10 @@ Todo queda local: Then **no hace peticiones de red** ni llama a ningún modelo p
 - **Otros plugins:** lee las barras de [plan-progress](https://github.com/zycck/claude-mods) para dejarles espacio cuando están encima de la banda. No escribe nada suyo.
 - **Lo que guarda:** tus ajustes (encendido, sonido, color, tema) y la última oferta, en el almacén de Claude Code para el plugin.
 - **Archivos que escribe y lee:** al terminar un turno escribe las opciones en `~/.claude/then/<sesión>.offer.json` (`{"id": null}` si no hay), para que una app al lado de la terminal las muestre, y mientras siguen arriba lee `<sesión>.pick.json` cada medio segundo: una elección ahí con el mismo `id` se manda como si tocaras la banda. Onzatchy (el notch del Mac) es una de esas apps. La carpeta es la que está al lado de tus transcripts de Claude Code.
+
+### Codex
+
+La terminal de Codex no deja dibujar la banda, así que Then llega a Codex como un **hook** que hace el resto: la misma regla, el mismo bloque `<then>`, elegir escribiendo `3` o `la 2 y la 4` + Enter, y las opciones en el buzón (`~/.codex/then/<sesión>.offer.json`, con `"provider": "codex"`) para que una app al lado de la terminal las dibuje. El bloque se ve en la conversación de Codex: ahí no hay cómo esconderlo. Necesita Node 23.6 o más nuevo; se agrega a `~/.codex/hooks.json` igual que arriba, y Codex lo corre recién cuando lo marcas como confiable.
 
 ### Cuánto consume
 

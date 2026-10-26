@@ -283,7 +283,8 @@ test('the reply is drawn without its block, and a turn with options chimes', { o
   on('turn.complete', () => ({ text: '' }))
   on('turn.start', (_, e) => ({ turnId: (e as { turnId: string }).turnId }))
   on('audio.play', (_, e) => {
-    played.push((e as { asset: string }).asset)
+    // the engine hands the hook the clip it resolved: `{ clip: { asset }, shouldLoop }`
+    played.push((e as { clip: { asset: string } }).clip.asset)
     return { value: undefined }
   })
   on('process.run', (_, e) => {

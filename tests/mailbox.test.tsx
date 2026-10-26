@@ -18,6 +18,12 @@ test('the mailbox sits beside the transcript config dir', async () => {
   expect(mailboxOf('C:\\Users\\ana\\.claude\\projects\\x\\abc.jsonl', 'abc')).toBe('C:\\Users\\ana\\.claude/then/abc')
   expect(mailboxOf('/tmp/no-config.jsonl', 'abc')).toBeNull()
   expect(mailboxOf(TRANSCRIPT, '../../etc')).toBeNull()
+  // Codex keeps its rollouts under <CODEX_HOME>/sessions/<yyyy>/<mm>/<dd>/
+  const rollout = '/Users/ana/.codex/sessions/2026/10/26/rollout-2026-10-26T12-07-42-01a1792e-a6d4.jsonl'
+  expect(mailboxOf(rollout, '01a1792e-a6d4')).toBe('/Users/ana/.codex/then/01a1792e-a6d4')
+  expect(mailboxOf('C:\\Users\\ana\\.codex\\sessions\\2026\\10\\26\\r.jsonl', 'abc')).toBe('C:\\Users\\ana\\.codex/then/abc')
+  // a folder that is only called «sessions» is not Codex's
+  expect(mailboxOf('/Users/ana/sessions/notes.jsonl', 'abc')).toBeNull()
 })
 
 test('a turn sent back for its options is not heard as a stop by the hooks beneath', { options: { language: 'español' } }, async ($, on) => {
@@ -81,6 +87,7 @@ test('a turn that ends with options writes them to the mailbox, and a pick there
   // written before the hooks beneath heard the stop
   const published = JSON.parse(offerAtStop ?? '{}')
   expect(published.id).toBe(1000)
+  expect(published.provider).toBe('claude')
   expect(published.suggested).toBe(2)
   expect(published.options.map((o: { title: string }) => o.title)).toEqual(OPTIONS)
 
