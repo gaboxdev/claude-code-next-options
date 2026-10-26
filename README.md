@@ -22,6 +22,7 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 - **★ suggested** marks the one Claude recommends.
 - **usage** shows what each option would spend in tokens and time: none, low, med, high.
 - **Hover a long description** and it scrolls so you can read all of it (terminal fullscreen mode or the desktop app).
+- **A soft chime** when a turn ends with options, so you can look away while Claude works (`/then sound off` mutes it).
 - **Forgot?** If Claude ends a turn of real work without options, the mod sends it back once to add them.
 
 ## Install
@@ -57,27 +58,27 @@ Everything else lives in `/config`, under the plugin (`/then color` wins over th
 
 Every palette color keeps white text at 5:1 contrast or better; a light custom color gets dark text instead.
 
-`/then` turns it off and on (`/then on`, `/then off`); both are remembered across sessions.
+`/then` turns it off and on (`/then on`, `/then off`), `/then sound on|off` the chime; all remembered across sessions.
 
 ## What it costs
 
-Then runs on your machine and calls no model of its own. What it spends is Claude's own tokens, measured on a real session (20 turns with options):
+Then runs on your machine and calls no model of its own. It spends a few of Claude's tokens, measured on a real session:
 
 | What | When | Tokens |
 |---|---|---|
-| Its rule in the system prompt | every request, cached after the first | ~245 |
-| The `offer` tool's definition | every request, cached after the first | ~295 |
-| Claude writing the 4 options | once per turn, output | ~145 |
-| The band's answer to Claude | once per turn, input | ~35 |
+| Its rule in the system prompt | every request, cached after the first | ~260 |
+| Claude writing the 4 options at the end of its reply | once per turn, output | ~50 |
 | Your pick, sent along with your message | when you pick | ~35 |
 
-The one cost worth knowing: since the options are a tool call, each turn has **one extra step** after it, and that step re-reads the conversation from the prompt cache (billed at a tenth of the input price). In a 40k-token conversation that is about the price of 4k fresh input tokens per turn, plus ~145 output tokens. If Claude forgets the options after real work, the mod asks once, which costs one more such step.
+That is all: the options ride at the end of Claude's own reply in a short block the mod reads and the transcript never draws, so there is **no tool call and no extra step** re-reading the conversation. If Claude forgets the options after real work, the mod asks once, and only that costs one more step.
 
-`/then off` removes all of it: no rule, no tool call, no extra step.
+Version 0.4 used a tool for this; moving to the block cut the fixed part in half (~540 → ~260), the per-turn output by two thirds (~145 → ~50), and removed the extra step, which in a 40k-token conversation cost about as much as 4k fresh input tokens every turn.
+
+`/then off` removes all of it.
 
 ## How it works
 
-It is a Claude mod (a Claude Code hooks module). It adds one short rule to the system prompt and one tool, `offer`, that Claude calls last in a turn with the 4 options. The band is drawn above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
+It is a Claude mod (a Claude Code hooks module). It adds one short rule to the system prompt asking Claude to end each reply with a `<then>` block of 4 lines (`n|title|detail|usage`, a `*` on the suggested one). The mod reads that block when the reply is in, hides it from the transcript (the stored message keeps it, so Claude knows what it offered) and draws the band above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
 
 Made to sit next to [plan-progress](https://github.com/zycck/claude-mods), whose look it borrows.
 
@@ -95,6 +96,7 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 - **★ sugerida** marca la que Claude recomienda.
 - **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto.
 - **Pasa el mouse sobre una descripción larga** y se desplaza para leerla entera (modo pantalla completa de la terminal o la app de escritorio).
+- **Suena suave** cuando un turno termina con opciones, para que puedas mirar otra cosa mientras Claude trabaja (`/then sonido off` lo calla).
 
 ### Instalar
 
@@ -115,18 +117,20 @@ Responde `y` para agregar el mercado y elige el alcance de usuario.
 /then color normal     → vuelve al de /config
 ```
 
-En `/config` están el idioma (`auto`, `español`, `english`) y el color por defecto. `/then` lo apaga y lo prende (`/then on`, `/then off`).
+En `/config` están el idioma (`auto`, `español`, `english`) y el color por defecto. `/then` lo apaga y lo prende (`/then on`, `/then off`) y `/then sonido on|off` maneja el sonido.
 
 ### Cuánto consume
 
-Then corre en tu máquina y no llama a ningún modelo propio. Gasta tokens de Claude, medidos en una sesión real:
+Then corre en tu máquina y no llama a ningún modelo propio. Gasta pocos tokens de Claude, medidos en una sesión real:
 
-- **Fijo, en el prompt de sistema:** ~540 tokens (la regla y la herramienta). Quedan en caché después de la primera petición.
-- **Por turno:** ~145 tokens de salida (Claude escribiendo las 4 opciones) y ~35 de entrada (la respuesta de la banda).
-- **Lo que más pesa:** como las opciones son una llamada a herramienta, cada turno tiene **un paso extra** que vuelve a leer la conversación desde la caché (cobrada a una décima del precio de entrada). En una conversación de 40k tokens equivale a unos 4k tokens de entrada por turno.
-- Si Claude olvida las opciones después de trabajar, el mod le pide una vez que las ponga: un paso extra más.
+- **Fijo, en el prompt de sistema:** ~260 tokens (la regla). Queda en caché después de la primera petición.
+- **Por turno:** ~50 tokens de salida, Claude escribiendo las 4 opciones al final de su respuesta.
+- **Al elegir:** ~35 tokens que viajan con tu mensaje.
+- **Sin paso extra:** las opciones van en un bloque corto al final de la respuesta, que el mod lee y no se dibuja. No hay llamada a herramienta ni un paso más que vuelva a leer la conversación. Solo si Claude las olvida después de trabajar, el mod le pide una vez que las ponga.
 
-`/then off` lo quita todo: sin regla, sin herramienta, sin paso extra.
+Frente a la versión 0.4 (que usaba una herramienta): la parte fija bajó a la mitad (~540 → ~260), la salida por turno a un tercio (~145 → ~50) y desapareció el paso extra, que en una conversación de 40k tokens costaba como 4k tokens de entrada en cada turno.
+
+`/then off` lo quita todo.
 
 ## License
 

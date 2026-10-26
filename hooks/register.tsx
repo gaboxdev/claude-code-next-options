@@ -3,13 +3,13 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Offer, Option, Usage } from '../types'
 
-const TOOL = 'mcp__then__offer'
 const offer = atom({ plugin: 'then', key: 'offer' } as const, null)
 const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
 // the colour `/then color …` picked: a palette name or a #RRGGBB; null keeps the one in /config
 const color = atom({ plugin: 'then', key: 'color' } as const, null)
 const STORE_COLOR = 'color'
 const STORE_ON = 'isOn'
+const STORE_SOUND = 'sound'
 const COUNT = 4
 // the band's own last row: none of the four, the person writes what they want
 const FREE = COUNT + 1
@@ -19,7 +19,7 @@ const FREE = COUNT + 1
 type Words = {
   title: string; hint: string; hintFree: string; badge: string; column: string; usage: Record<Usage, string>
   free: string; freeDetail: string; writing: string; writingDetail: string; option: string; off: string; on: string; command: string
-  argumentHint: string; help: string; colors: Record<string, string>
+  argumentHint: string; help: string; colors: Record<string, string>; soundOn: string; soundOff: string
   colorList: (current: string) => string; colorSet: (name: string) => string; colorBad: (arg: string) => string; colorReset: string
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
@@ -30,8 +30,10 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
     off: 'Then apagado. /then lo prende de nuevo.', on: 'Then prendido: al final de cada turno vas a ver 4 opciones para elegir con un número.',
     command: 'Prender o apagar las opciones al final de cada turno, o cambiar su color',
-    argumentHint: '[color <nombre|#RRGGBB>] | on | off',
-    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757',
+    argumentHint: '[color <nombre|#RRGGBB>] | sonido on|off | on | off',
+    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757 · /then sonido off',
+    soundOn: 'Then suena al terminar cada turno con opciones. /then sonido off lo calla.',
+    soundOff: 'Then ya no suena. /then sonido on lo vuelve a prender.',
     colors: { blue: 'azul', violet: 'violeta', green: 'verde', amber: 'ámbar', pink: 'rosa', cyan: 'cian' },
     colorList: c => `Color de Then: ${c}. Para cambiarlo: /then color azul | violeta | verde | ámbar | rosa | cian, o /then color #RRGGBB (por ejemplo #D97757). /then color normal vuelve al de /config.`,
     colorSet: c => `Then ahora es ${c}. La banda ya se dibuja con ese color.`,
@@ -45,8 +47,10 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
     off: 'Then is off. /then turns it back on.', on: 'Options on: each turn ends with 4 to pick by number.',
     command: 'Turn the options at the end of each turn on or off, or change their color',
-    argumentHint: '[color <name|#RRGGBB>] | on | off',
-    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757',
+    argumentHint: '[color <name|#RRGGBB>] | sound on|off | on | off',
+    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757 · /then sound off',
+    soundOn: 'Then chimes when a turn ends with options. /then sound off mutes it.',
+    soundOff: 'Then is muted. /then sound on turns the chime back on.',
     colors: { blue: 'blue', violet: 'violet', green: 'green', amber: 'amber', pink: 'pink', cyan: 'cyan' },
     colorList: c => `Then is ${c}. To change it: /then color blue | violet | green | amber | pink | cyan, or /then color #RRGGBB (e.g. #D97757). /then color default goes back to /config.`,
     colorSet: c => `Then is now ${c}. The band draws in it right away.`,
@@ -141,10 +145,18 @@ const METER_W = 9
 // set while the band is on screen: a digit typed into the empty composer picks only then
 let isBandShown = false
 
+// the options travel at the end of Claude's own reply, in a block the mod reads and the transcript never draws: no tool
+// call, so a turn has no extra step that re-reads the conversation
 const RULES = `# Then (next options)
-At the end of every turn where you did or answered something, call ${TOOL} as your LAST tool call, right before your final message, with exactly ${COUNT} options for how to continue, most useful first: concrete next actions you can start right away (title at most 6 words, detail at most 14 words, both in the user's language). Mark the one you recommend with suggested (its number), and give each option usage, what it would spend in tokens and time: none (nothing to run), low (a few reads or one command), medium (several edits or a build), high (many files, agents or long runs). The person picks by typing the number, so never list the options again in your message and never end by asking which one to do; the band above the prompt asks. Skip it only when you end on a question the person must answer in their own words, or you called AskUserQuestion.`
+End every reply where you did or answered something with exactly ${COUNT} options for how to continue, as the very last thing, outside any code block, in this form:
+<then>
+1|title|detail|usage
+2*|title|detail|usage
+3|title|detail|usage
+4|title|detail|usage
+</then>
+title: a concrete next action you can start right away, at most 6 words; detail: at most 12 words; both in the user's language. Put * after the one number you recommend. usage: none, low, med or high, what it would spend in tokens and time (none: nothing to run; low: a few reads or one command; med: several edits or a build; high: many files, agents or long runs). Most useful first. The person sees them as a numbered band above the prompt and picks by number, so never also list them in prose and never ask which one to do. Leave the block out only when you end on a question the person must answer in their own words, or you called AskUserQuestion.`
 
-type Raw = Record<string, unknown>
 // the cut drops half a character left at the edge (an emoji is two UTF-16 units)
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max).replace(/[\uD800-\uDBFF]$/, '').trimEnd() : '')
 
@@ -188,23 +200,54 @@ const joinNumbers = (n: number[]) => (n.length === 1 ? `${n[0]}` : `${n.slice(0,
 const describe = (o: Option) => `«${o.title}»${o.detail ? ` (${o.detail})` : ''}`
 
 function pickContext(o: Offer, picks: number[], rest: string): string {
-  if (picks.includes(FREE)) return `The person passed on the options you offered with ${TOOL} and asked for this instead: «${rest}».`
+  if (picks.includes(FREE)) return `The person passed on the options you offered at the end of your last reply and asked for this instead: «${rest}».`
   const chosen = picks.map(n => `${n}. ${describe(o.options[n - 1] as Option)}`).join('; ')
   const head = picks.length === 1 ? `The person picked option ${picks[0]}` : `The person picked options ${joinNumbers(picks)}, in that order`
-  return `${head} of the ones you offered with ${TOOL}: ${chosen}. Do that now.${rest ? ` They added: «${rest}».` : ''}`
+  return `${head} of the ones you offered at the end of your last reply: ${chosen}. Do that now.${rest ? ` They added: «${rest}».` : ''}`
 }
 
 // ---------- the offer ----------
 
-function normalize(raw: Raw, now: number): Offer | string {
-  const list = Array.isArray(raw.options) ? (raw.options as unknown[]) : []
-  const options = list
-    .map(x => (x && typeof x === 'object' ? (x as Raw) : { title: x }))
-    .map(x => ({ title: str(x.title, 60), detail: str(x.detail, 110), ...(USAGES.includes(x.usage as Usage) ? { usage: x.usage as Usage } : {}) }))
-    .filter(x => x.title)
-  if (options.length !== COUNT) return `then: send exactly ${COUNT} options with a title each; got ${options.length}.`
-  const suggested = typeof raw.suggested === 'number' && raw.suggested >= 1 && raw.suggested <= COUNT ? Math.round(raw.suggested) : null
-  return { title: str(raw.title, 40) || T.title, options, at: now, suggested }
+const BLOCK = /<then>([\s\S]*?)(?:<\/then>|$)/
+const USAGE_WORDS: Record<string, Usage> = {
+  none: 'none', nada: 'none', low: 'low', bajo: 'low', med: 'medium', medium: 'medium', medio: 'medium', high: 'high', alto: 'high',
+}
+
+// the <then> block at the end of a reply: four `n[*]|title|detail|usage` lines; null when there is none or it is not four
+export function parseBlock(text: string): { options: Option[]; suggested: number | null } | null {
+  const body = BLOCK.exec(text)?.[1]
+  if (body === undefined) return null
+  const options: Option[] = []
+  let suggested: number | null = null
+  for (const line of body.split('\n')) {
+    const row = /^\s*[1-9]\s*(\*)?\s*[|.)]\s*(.*)$/.exec(line)
+    if (!row) continue
+    const [title = '', detail = '', usage = ''] = (row[2] ?? '').split('|').map(part => part.trim())
+    if (!title) continue
+    const u = USAGE_WORDS[usage.toLowerCase()]
+    options.push({ title: str(title, 60), detail: str(detail, 110), ...(u ? { usage: u } : {}) })
+    if (row[1]) suggested = options.length
+  }
+  return options.length === COUNT ? { options, suggested } : null
+}
+
+// the reply as the transcript draws it: the block gone, and while it streams, a half-typed `<then` at the end too
+export const stripBlock = (text: string) =>
+  text.replace(/\s*<then>[\s\S]*?(?:<\/then>|$)/, '').replace(/\s*<(?:t(?:h(?:e(?:n)?)?)?)?$/, '').trimEnd()
+
+// the chime a turn with options ends on; Windows plays it through its own player, where the engine's can stay silent
+function chime($: EngineInterface) {
+  const file = `${$.plugin.root}/sounds/listo.wav`
+  if (/^[A-Za-z]:/.test($.plugin.root)) {
+    void $.process
+      .run(['powershell', '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '(New-Object Media.SoundPlayer $env:THEN_WAV).PlaySync()'], {
+        env: { THEN_WAV: file.replace(/\//g, '\\') },
+        timeoutMs: 5000,
+      })
+      .catch(() => undefined)
+    return
+  }
+  void $.audio.play({ asset: 'sounds/listo.wav' }).catch(() => undefined)
 }
 
 async function clear($: EngineInterface) {
@@ -238,6 +281,7 @@ export const register: Register = (on, options) => {
   let hasOffered = false
   let hasAsked = false
   let hasNudged = false
+  let isSoundOn = true
 
   on('turn.start', async ($, e, next) => {
     if (!e.agentId) {
@@ -251,37 +295,12 @@ export const register: Register = (on, options) => {
   })
 
   on('session.start', async ($, e, next) => {
-    await $.tool.register({
-      name: 'offer',
-      description: `Shows ${COUNT} numbered options above the prompt for how to continue; the person answers with a number. Call it last in a turn.`,
-      inputSchema: {
-        type: 'object',
-        required: ['options'],
-        properties: {
-          title: { type: 'string', description: 'Short header, default "¿Cómo seguimos?"' },
-          suggested: { type: 'integer', minimum: 1, maximum: COUNT, description: 'The number of the option you recommend' },
-          options: {
-            type: 'array',
-            minItems: COUNT,
-            maxItems: COUNT,
-            items: {
-              type: 'object',
-              required: ['title'],
-              properties: {
-                title: { type: 'string', description: 'The action, at most 6 words' },
-                detail: { type: 'string', description: 'What it does or why, at most 14 words' },
-                usage: { enum: USAGES, description: 'What it would spend: none, low, medium or high' },
-              },
-            },
-          },
-        },
-      },
-    })
     const rows = await $.config.list().catch(() => [])
     T = WORDS_BY[languageOf(languageSetting, rows.find(row => row.key === 'language')?.value)]
     await $.command.register({ name: 'then', description: T.command, argumentHint: T.argumentHint })
     const storedColor = await $.store.get(STORE_COLOR)
     if (typeof storedColor === 'string' && parseColor(storedColor)) await update($, color, () => storedColor)
+    isSoundOn = (await $.store.get(STORE_SOUND)) !== false
     const stored = await $.store.get(STORE_ON)
     if (stored === false) await update($, isOn, () => false)
     const theme = rows.find(row => row.key === 'theme')
@@ -316,19 +335,34 @@ export const register: Register = (on, options) => {
     return { sections: [...result.sections, { id: 'then:rules', text: RULES, scope: 'session' as const }] }
   })
 
-  on('tool.call', { tool: TOOL }, async ($, e) => {
-    if (e.agentId) return { deny: 'then: only the main session offers options to the person.' }
-    if (!(await read($, isOn))) return { result: 'then is off; nothing shown.' }
-    const made = normalize(e as unknown as Raw, await $.clock.now())
-    if (typeof made === 'string') return { deny: made }
-    await update($, offer, () => made)
+  // the main loop's reply is read once it is in: a <then> block becomes the band
+  on('turn.step', async function* ($, e, next) {
+    const response = yield* next(e)
+    if (e.agentId || !response.answer.includes('<then>') || !(await read($, isOn))) return response
+    const parsed = parseBlock(response.answer)
+    if (!parsed) return response
+    const now = await $.clock.now()
+    await update($, offer, () => ({ title: T.title, options: parsed.options, at: now, suggested: parsed.suggested }))
     hasOffered = true
 
-    return { result: `Shown above the prompt as 1-${COUNT}, with ${FREE} for the person's own request. Now end with a short final message that does not repeat them.` }
+    return response
+  })
+
+  // the transcript draws the reply without its block; the stored message keeps it, so Claude still reads what it offered
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) =>
+    e.props.text.includes('<the') || /<t?h?e?n?$/.test(e.props.text) ? next({ ...e, props: { ...e.props, text: stripBlock(e.props.text) } }) : next(e),
+  )
+
+  // a turn that ends with options chimes, once, as it hands the prompt back
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (!e.agentId && hasOffered && isSoundOn && (await read($, isOn))) chime($)
+
+    return result
   })
 
   on('tool.call', async ($, e, next) => {
-    if (!e.agentId && e.tool !== TOOL) {
+    if (!e.agentId) {
       workCalls += 1
       if (e.tool === 'AskUserQuestion') hasAsked = true
     }
@@ -359,7 +393,7 @@ export const register: Register = (on, options) => {
     if (/\?\s*$/.test(e.last_assistant_message ?? '')) return result
     hasNudged = true
 
-    return { ...result, block: `then: call ${TOOL} with ${COUNT} options for how to continue, then end with one short line.` }
+    return { ...result, block: `then: end your reply with the <then> block of ${COUNT} options from the rule, and nothing else.` }
   })
 
   // `/then` turns it on or off; `/then on|off` says which; `/then color …` lists, sets or resets the band's colour
@@ -381,6 +415,12 @@ export const register: Register = (on, options) => {
       await update($, color, () => chosen)
       await $.store.set(STORE_COLOR, chosen)
       return { text: T.colorSet(nameOf(chosen)) }
+    }
+    if (word === 'sound' || word === 'sonido') {
+      isSoundOn = !/^(off|apagar|no)$/i.test(arg)
+      await $.store.set(STORE_SOUND, isSoundOn)
+      if (isSoundOn) chime($)
+      return { text: isSoundOn ? T.soundOn : T.soundOff }
     }
     if (word && !/^(on|off|prender|apagar)$/.test(word)) return { text: T.help }
     const was = await read($, isOn)

@@ -9,6 +9,19 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 100 },
 } as const
 
+
+// the reply a turn ends on, with its <then> block, as Claude writes it
+let reply = ''
+const block = (opts: { title: string; detail?: string; usage?: string }[], suggested?: number) =>
+  `Listo, quedó hecho.\n\n<then>\n${opts.map((o, i) => `${i + 1}${suggested === i + 1 ? '*' : ''}|${o.title}|${o.detail ?? ''}|${o.usage ?? ''}`).join('\n')}\n</then>`
+// one step of the main loop answering with that reply, read through as the engine reads it
+async function offer($: { turn: { step: (e: never) => AsyncGenerator<unknown, unknown> & { result: Promise<unknown> } } }, text: string) {
+  reply = text
+  const stream = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)
+  for await (const chunk of stream) void chunk
+  await stream.result
+}
+
 const OPTIONS = [
   { title: 'Probar en el navegador', detail: 'abrir la pantalla y revisarla', usage: 'low' },
   { title: 'Commitear lo propio', detail: 'solo los archivos de esta sesión', usage: 'medium' },
@@ -18,8 +31,10 @@ const OPTIONS = [
 
 test('the band draws the four options and a typed pick reaches the model', { options: { language: 'español' } }, async ($, on) => {
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('prompt.submit', (_, e) => ({ text: e.text, context: e.context }))
   on('store.get', () => ({ value: undefined }))
   on('clock.now', () => ({ value: 1000 }))
@@ -32,7 +47,7 @@ test('the band draws the four options and a typed pick reaches the model', { opt
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS, suggested: 2 } as never)
+  await offer($, block(OPTIONS, 2))
 
   const ui = await $.ui.mount(BAND as never)
   expect((await ui.find({ type: 'Text', text: /Probar en el navegador/ }))?.text.trim()).toBe('Probar en el navegador')
@@ -67,8 +82,10 @@ test('the band draws the four options and a typed pick reaches the model', { opt
 test('a bare digit in the empty composer picks at once', { options: { language: 'español' } }, async ($, on) => {
   const sent: string[] = []
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('prompt.submit', (_, e) => {
     sent.push(e.text)
     return { text: e.text }
@@ -85,7 +102,7 @@ test('a bare digit in the empty composer picks at once', { options: { language: 
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
+  await offer($, block(OPTIONS))
   const ui = await $.ui.mount(BAND as never)
 
   // a digit inside a draft types as usual
@@ -105,8 +122,10 @@ test('a bare digit in the empty composer picks at once', { options: { language: 
 test('row 5 is free: the band stays while the person writes their own', { options: { language: 'español' } }, async ($, on) => {
   const sent: { text: string; context?: readonly string[] }[] = []
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('prompt.submit', (_, e) => {
     sent.push({ text: e.text, context: e.context })
     return { text: e.text, context: e.context }
@@ -123,7 +142,7 @@ test('row 5 is free: the band stays while the person writes their own', { option
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
+  await offer($, block(OPTIONS))
   const ui = await $.ui.mount(BAND as never)
   const edit = ($.prompt as unknown as { edit: (e: unknown) => Promise<{ text: string }> }).edit
   const key = (text: string, inputText: string) => edit({ origin: { kind: 'composer' }, text, cursor: text.length, start: text.length, end: text.length, inputText })
@@ -147,8 +166,10 @@ const LONG = 'una descripción bastante larga que no entra entera en la columna 
 
 test('a long detail scrolls under the pointer and settles back when it leaves', async ($, on) => {
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('store.get', () => ({ value: undefined }))
   on('clock.now', () => ({ value: 1000 }))
   on('config.list', () => ({ value: [] }))
@@ -160,7 +181,7 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: [{ title: 'Larga', detail: LONG }, ...OPTIONS.slice(1)] } as never)
+  await offer($, block([{ title: 'Larga', detail: LONG }, ...OPTIONS.slice(1)]))
   const ui = (await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 70 } } as never)) as unknown as Mounted<'terminal', 'AbovePrompt'>
   const key = 'detalle-1000-1'
   const shown = async () => (await ui.find({ type: 'Text', in: key }))?.text ?? ''
@@ -180,8 +201,10 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
 
 test('the color option paints the band', { options: { color: 'custom', customColor: '#D97757', language: 'english' } }, async ($, on) => {
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('store.get', () => ({ value: undefined }))
   on('clock.now', () => ({ value: 1000 }))
   on('config.list', () => ({ value: [] }))
@@ -193,7 +216,7 @@ test('the color option paints the band', { options: { color: 'custom', customCol
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
+  await offer($, block(OPTIONS))
   const ui = await $.ui.mount(BAND as never)
   const pill = await ui.find({ type: 'Text', text: /^ 1 $/ })
   expect((pill as unknown as { props: { backgroundColor: string } }).props.backgroundColor).toBe('#d97757')
@@ -206,8 +229,10 @@ test('the color option paints the band', { options: { color: 'custom', customCol
 test('/then color changes the band at once, in either language', { options: { language: 'español' } }, async ($, on) => {
   const stored: Record<string, unknown> = {}
   on('command.register', () => ({ value: { command: 'then' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
   on('store.get', () => ({ value: undefined }))
   on('store.set', (_, e) => {
     stored[(e as { key: string }).key] = (e as { value: unknown }).value
@@ -225,7 +250,7 @@ test('/then color changes the band at once, in either language', { options: { la
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
+  await offer($, block(OPTIONS))
   const run = (args: string) => $.command.run({ command: 'then', args } as never) as Promise<{ text: string }>
 
   expect((await run('color')).text).toContain('Color de Then: azul')
@@ -239,4 +264,42 @@ test('/then color changes the band at once, in either language', { options: { la
   expect((await run('color fucsia')).text).toContain('No conozco')
   expect((await run('color normal')).text).toContain('/config')
   expect((await run('lo que sea')).text).toContain('Uso: /then')
+})
+
+test('the reply is drawn without its block, and a turn with options chimes', { options: { language: 'español' } }, async ($, on) => {
+  const played: string[] = []
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('turn.complete', () => ({ text: '' }))
+  on('turn.start', (_, e) => ({ turnId: (e as { turnId: string }).turnId }))
+  on('audio.play', (_, e) => {
+    played.push((e as { asset: string }).asset)
+    return { value: undefined }
+  })
+  on('process.run', (_, e) => {
+    played.push(JSON.stringify(e))
+    return { value: { exitCode: 0, stdout: '', stderr: '' } }
+  })
+  on('store.get', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>{(e.props as { text?: string }).text ?? ''}</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.turn.start({ text: 'hola', turnId: 't1' } as never)
+  await offer($, block(OPTIONS, 2))
+  await $.turn.complete({ turnId: 't1', reason: 'answer', answer: reply } as never)
+  expect(played.length).toBe(1)
+  expect(played[0]).toContain('listo.wav')
+
+  const msg = await $.ui.mount({ plugin: 'then', component: 'AssistantMessage', requestId: 'm1', surface: 'terminal', props: { text: block(OPTIONS, 2), isFirstOfReply: true } } as never)
+  expect((await msg.find({ type: 'Text' }))?.text).toBe('Listo, quedó hecho.')
+  await msg.unmount()
 })

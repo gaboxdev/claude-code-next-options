@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { parsePick } from '../hooks/register'
+import { parseBlock, parsePick, stripBlock } from '../hooks/register'
 
 test('what counts as a pick', () => {
   expect(parsePick('3')).toEqual({ picks: [3], rest: '' })
@@ -18,4 +18,24 @@ test('what counts as a pick', () => {
   expect(parsePick("lets do 2 and 4")).toEqual({ picks: [2, 4], rest: '' })
   expect(parsePick('the third one')).toEqual({ picks: [3, 1], rest: '' })
   expect(parsePick('no, 3 is wrong')).toBe(null)
+})
+
+test('the <then> block: read, and cut from what is drawn', () => {
+  const reply = 'Hecho.\n\n<then>\n1|Correr las pruebas|que nada se rompa|low\n2*|Subir mis cambios|solo mis archivos|med\n3|Escribir un chequeo|revisar cada push|alto\n4|Dejarlo así||nada\n</then>'
+  expect(parseBlock(reply)).toEqual({
+    options: [
+      { title: 'Correr las pruebas', detail: 'que nada se rompa', usage: 'low' },
+      { title: 'Subir mis cambios', detail: 'solo mis archivos', usage: 'medium' },
+      { title: 'Escribir un chequeo', detail: 'revisar cada push', usage: 'high' },
+      { title: 'Dejarlo así', detail: '', usage: 'none' },
+    ],
+    suggested: 2,
+  })
+  expect(parseBlock('no block here')).toBe(null)
+  expect(parseBlock('<then>\n1|solo una\n</then>')).toBe(null)
+  expect(stripBlock(reply)).toBe('Hecho.')
+  // while it streams: a block not closed yet, and a tag half typed
+  expect(stripBlock('Hecho.\n\n<then>\n1|Correr')).toBe('Hecho.')
+  expect(stripBlock('Hecho.\n\n<th')).toBe('Hecho.')
+  expect(stripBlock('a <thing> stays')).toBe('a <thing> stays')
 })
