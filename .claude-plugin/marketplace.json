@@ -1,12 +1,17 @@
 {
-  "name": "claude-code-next-options",
-  "owner": { "name": "Gabriel Mendoza", "url": "https://github.com/gaboxdev" },
-  "metadata": { "description": "Next options for Claude Code: pick how to continue with one keystroke" },
+  "name": "then",
+  "owner": {
+    "name": "Gabriel Mendoza",
+    "url": "https://github.com/gaboxdev"
+  },
+  "metadata": {
+    "description": "Then — a Claude mod: pick how to continue with one keystroke"
+  },
   "plugins": [
     {
-      "name": "opciones",
+      "name": "then",
       "source": "./",
-      "description": "Ends every turn with 4 numbered next steps above the prompt (plus a free one): type the number and go"
+      "description": "Every turn ends with 4 numbered next steps above the prompt (plus a free one): type the number and go"
     }
   ]
 }

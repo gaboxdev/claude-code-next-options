@@ -1,7 +1,7 @@
 {
-  "name": "opciones",
-  "version": "0.2.0",
-  "description": "Ends every Claude Code turn with 4 numbered next steps above the prompt (plus a free one): type 1-5 and go. Shows the suggested one and what each would spend. / Cuatro opciones para seguir al final de cada turno: escribes el número y listo.",
+  "name": "then",
+  "version": "0.3.0",
+  "description": "Then — a Claude mod. Every turn ends with 4 numbered next steps above the prompt (plus a free one): type the number and go. / Cada turno termina con 4 opciones: escribes el número y listo.",
   "author": {
     "name": "Gabriel Mendoza",
     "url": "https://github.com/gaboxdev"

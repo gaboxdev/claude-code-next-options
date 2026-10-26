@@ -3,9 +3,9 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Offer, Option, Usage } from '../types'
 
-const TOOL = 'mcp__opciones__ofrecer'
-const offer = atom({ plugin: 'opciones', key: 'offer' } as const, null)
-const isOn = atom({ plugin: 'opciones', key: 'isOn' } as const, true)
+const TOOL = 'mcp__then__offer'
+const offer = atom({ plugin: 'then', key: 'offer' } as const, null)
+const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
 const STORE_ON = 'isOn'
 const COUNT = 4
 // the band's own last row: none of the four, the person writes what they want
@@ -23,7 +23,7 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     badge: '★ sugerida', column: 'consumo ▾', usage: { none: 'nada', low: 'bajo', medium: 'medio', high: 'alto' },
     free: 'Otra cosa (libre)', freeDetail: 'ninguna de estas: escribe lo que quieras',
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
-    off: 'Opciones apagadas. /opciones las prende de nuevo.', on: 'Opciones prendidas: al final de cada turno vas a ver 4 para elegir con un número.',
+    off: 'Then apagado. /then lo prende de nuevo.', on: 'Then prendido: al final de cada turno vas a ver 4 opciones para elegir con un número.',
     command: 'Prender o apagar las opciones al final de cada turno',
   },
   en: {
@@ -31,7 +31,7 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     badge: '★ suggested', column: 'usage ▾', usage: { none: 'none', low: 'low', medium: 'med', high: 'high' },
     free: 'Something else', freeDetail: 'none of these: type your own',
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
-    off: 'Options off. /opciones turns them back on.', on: 'Options on: each turn ends with 4 to pick by number.',
+    off: 'Then is off. /then turns it back on.', on: 'Options on: each turn ends with 4 to pick by number.',
     command: 'Turn the options at the end of each turn on or off',
   },
 }
@@ -107,7 +107,7 @@ const METER_W = 9
 // set while the band is on screen: a digit typed into the empty composer picks only then
 let isBandShown = false
 
-const RULES = `# Next options
+const RULES = `# Then (next options)
 At the end of every turn where you did or answered something, call ${TOOL} as your LAST tool call, right before your final message, with exactly ${COUNT} options for how to continue, most useful first: concrete next actions you can start right away (title at most 6 words, detail at most 14 words, both in the user's language). Mark the one you recommend with suggested (its number), and give each option usage, what it would spend in tokens and time: none (nothing to run), low (a few reads or one command), medium (several edits or a build), high (many files, agents or long runs). The person picks by typing the number, so never list the options again in your message and never end by asking which one to do; the band above the prompt asks. Skip it only when you end on a question the person must answer in their own words, or you called AskUserQuestion.`
 
 type Raw = Record<string, unknown>
@@ -168,7 +168,7 @@ function normalize(raw: Raw, now: number): Offer | string {
     .map(x => (x && typeof x === 'object' ? (x as Raw) : { title: x }))
     .map(x => ({ title: str(x.title, 60), detail: str(x.detail, 110), ...(USAGES.includes(x.usage as Usage) ? { usage: x.usage as Usage } : {}) }))
     .filter(x => x.title)
-  if (options.length !== COUNT) return `opciones: send exactly ${COUNT} options with a title each; got ${options.length}.`
+  if (options.length !== COUNT) return `then: send exactly ${COUNT} options with a title each; got ${options.length}.`
   const suggested = typeof raw.suggested === 'number' && raw.suggested >= 1 && raw.suggested <= COUNT ? Math.round(raw.suggested) : null
   return { title: str(raw.title, 40) || T.title, options, at: now, suggested }
 }
@@ -217,7 +217,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await $.tool.register({
-      name: 'ofrecer',
+      name: 'offer',
       description: `Shows ${COUNT} numbered options above the prompt for how to continue; the person answers with a number. Call it last in a turn.`,
       inputSchema: {
         type: 'object',
@@ -244,7 +244,7 @@ export const register: Register = (on, options) => {
     })
     const rows = await $.config.list().catch(() => [])
     T = WORDS_BY[languageOf(languageSetting, rows.find(row => row.key === 'language')?.value)]
-    await $.command.register({ name: 'opciones', description: T.command })
+    await $.command.register({ name: 'then', description: T.command })
     const stored = await $.store.get(STORE_ON)
     if (stored === false) await update($, isOn, () => false)
     const theme = rows.find(row => row.key === 'theme')
@@ -276,12 +276,12 @@ export const register: Register = (on, options) => {
     const result = await next(e)
     if (!(await read($, isOn))) return result
 
-    return { sections: [...result.sections, { id: 'opciones:rules', text: RULES, scope: 'session' as const }] }
+    return { sections: [...result.sections, { id: 'then:rules', text: RULES, scope: 'session' as const }] }
   })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
-    if (e.agentId) return { deny: 'opciones: only the main session offers options to the person.' }
-    if (!(await read($, isOn))) return { result: 'opciones is off; nothing shown.' }
+    if (e.agentId) return { deny: 'then: only the main session offers options to the person.' }
+    if (!(await read($, isOn))) return { result: 'then is off; nothing shown.' }
     const made = normalize(e as unknown as Raw, await $.clock.now())
     if (typeof made === 'string') return { deny: made }
     await update($, offer, () => made)
@@ -322,10 +322,10 @@ export const register: Register = (on, options) => {
     if (/\?\s*$/.test(e.last_assistant_message ?? '')) return result
     hasNudged = true
 
-    return { ...result, block: `opciones: call ${TOOL} with ${COUNT} options for how to continue, then end with one short line.` }
+    return { ...result, block: `then: call ${TOOL} with ${COUNT} options for how to continue, then end with one short line.` }
   })
 
-  on('command.run', { command: 'opciones' }, async $ => {
+  on('command.run', { command: 'then' }, async $ => {
     const was = await read($, isOn)
     await update($, isOn, () => !was)
     await $.store.set(STORE_ON, !was)
@@ -403,11 +403,11 @@ export const register: Register = (on, options) => {
           <Text color={INK} backgroundColor={accent()} weight="semibold">{` ${o.title} `}</Text>
           <Text dimColor wrap="truncate">{o.isFree ? T.hintFree : T.hint}</Text>
           <Box flexGrow={1} />
-          {hasClicks ? <Button key="opciones-cerrar" plain dimColor label="✕" onPress={() => clear($)} /> : null}
+          {hasClicks ? <Button key="then-cerrar" plain dimColor label="✕" onPress={() => clear($)} /> : null}
         </Box>
         {hasMeter ? (
           // the meter column's own heading, right over it, so the bars read as what each option spends
-          <Box key="opciones-columnas" flexDirection="row" marginLeft={2}>
+          <Box key="then-columnas" flexDirection="row" marginLeft={2}>
             <Text>{' '.repeat(W - 1 - METER_W)}</Text>
             <Text color={star} weight="semibold">{T.column.padEnd(METER_W)}</Text>
           </Box>

@@ -1,4 +1,6 @@
-# Next options for Claude Code
+# Then
+
+**A Claude mod** for Claude Code: what's next, one keystroke away.
 
 **English** · [Español](#español)
 
@@ -27,7 +29,7 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 At the prompt of a Claude Code session:
 
 ```
-/plugin install opciones --marketplace gaboxdev/claude-code-next-options
+/plugin install then --marketplace gaboxdev/then
 ```
 
 Answer `y` to add the marketplace, then pick the user scope. It works from the next turn on.
@@ -44,17 +46,19 @@ In `/config`, under the plugin:
 
 Every palette color keeps white text at 5:1 contrast or better; a light custom color gets dark text instead.
 
-`/opciones` turns the options off and on (remembered across sessions).
+`/then` turns it off and on (remembered across sessions).
 
 ## How it works
 
-It is a Claude Code mod (a hooks module). It adds one short rule to the system prompt and one tool, `ofrecer`, that Claude calls last in a turn with the 4 options. The band is drawn above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
+It is a Claude mod (a Claude Code hooks module). It adds one short rule to the system prompt and one tool, `offer`, that Claude calls last in a turn with the 4 options. The band is drawn above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
 
 Made to sit next to [plan-progress](https://github.com/zycck/claude-mods), whose look it borrows.
 
 ---
 
 ## Español
+
+**Then** es un Claude mod para Claude Code.
 
 Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir encima del prompt**, más una quinta que escribes tú. Escribes el número y listo.
 
@@ -68,14 +72,14 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 ### Instalar
 
 ```
-/plugin install opciones --marketplace gaboxdev/claude-code-next-options
+/plugin install then --marketplace gaboxdev/then
 ```
 
 Responde `y` para agregar el mercado y elige el alcance de usuario.
 
 ### Ajustes
 
-En `/config`: idioma (`auto`, `español`, `english`), color de la banda (`blue`, `violet`, `green`, `amber`, `pink`, `cyan`, `custom`) y color personalizado (`#RRGGBB`). `/opciones` las apaga y las prende.
+En `/config`: idioma (`auto`, `español`, `english`), color de la banda (`blue`, `violet`, `green`, `amber`, `pink`, `cyan`, `custom`) y color personalizado (`#RRGGBB`). `/then` lo apaga y lo prende.
 
 ## License
 

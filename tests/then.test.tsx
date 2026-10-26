@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Mounted } from 'claude-code/testing'
 
 const BAND = {
-  plugin: 'opciones',
+  plugin: 'then',
   component: 'AbovePrompt',
   requestId: 'band',
   surface: 'terminal',
@@ -17,8 +17,8 @@ const OPTIONS = [
 ]
 
 test('the band draws the four options and a typed pick reaches the model', { options: { language: 'español' } }, async ($, on) => {
-  on('command.register', () => ({ value: { command: 'opciones' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__opciones__ofrecer' } }))
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => ({ text: e.text, context: e.context }))
   on('store.get', () => ({ value: undefined }))
@@ -32,7 +32,7 @@ test('the band draws the four options and a typed pick reaches the model', { opt
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__opciones__ofrecer', options: OPTIONS, suggested: 2 } as never)
+  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS, suggested: 2 } as never)
 
   const ui = await $.ui.mount(BAND as never)
   expect((await ui.find({ type: 'Text', text: /Probar en el navegador/ }))?.text.trim()).toBe('Probar en el navegador')
@@ -66,8 +66,8 @@ test('the band draws the four options and a typed pick reaches the model', { opt
 
 test('a bare digit in the empty composer picks at once', { options: { language: 'español' } }, async ($, on) => {
   const sent: string[] = []
-  on('command.register', () => ({ value: { command: 'opciones' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__opciones__ofrecer' } }))
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => {
     sent.push(e.text)
@@ -85,7 +85,7 @@ test('a bare digit in the empty composer picks at once', { options: { language: 
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__opciones__ofrecer', options: OPTIONS } as never)
+  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
   const ui = await $.ui.mount(BAND as never)
 
   // a digit inside a draft types as usual
@@ -104,8 +104,8 @@ test('a bare digit in the empty composer picks at once', { options: { language: 
 
 test('row 5 is free: the band stays while the person writes their own', { options: { language: 'español' } }, async ($, on) => {
   const sent: { text: string; context?: readonly string[] }[] = []
-  on('command.register', () => ({ value: { command: 'opciones' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__opciones__ofrecer' } }))
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => {
     sent.push({ text: e.text, context: e.context })
@@ -123,7 +123,7 @@ test('row 5 is free: the band stays while the person writes their own', { option
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__opciones__ofrecer', options: OPTIONS } as never)
+  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
   const ui = await $.ui.mount(BAND as never)
   const edit = ($.prompt as unknown as { edit: (e: unknown) => Promise<{ text: string }> }).edit
   const key = (text: string, inputText: string) => edit({ origin: { kind: 'composer' }, text, cursor: text.length, start: text.length, end: text.length, inputText })
@@ -146,8 +146,8 @@ test('row 5 is free: the band stays while the person writes their own', { option
 const LONG = 'una descripción bastante larga que no entra entera en la columna del detalle y hay que leerla'
 
 test('a long detail scrolls under the pointer and settles back when it leaves', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'opciones' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__opciones__ofrecer' } }))
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('store.get', () => ({ value: undefined }))
   on('clock.now', () => ({ value: 1000 }))
@@ -160,7 +160,7 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__opciones__ofrecer', options: [{ title: 'Larga', detail: LONG }, ...OPTIONS.slice(1)] } as never)
+  await $.tool.call({ tool: 'mcp__then__offer', options: [{ title: 'Larga', detail: LONG }, ...OPTIONS.slice(1)] } as never)
   const ui = (await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 70 } } as never)) as unknown as Mounted<'terminal', 'AbovePrompt'>
   const key = 'detalle-1000-1'
   const shown = async () => (await ui.find({ type: 'Text', in: key }))?.text ?? ''
@@ -179,8 +179,8 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
 })
 
 test('the color option paints the band', { options: { color: 'custom', customColor: '#D97757', language: 'english' } }, async ($, on) => {
-  on('command.register', () => ({ value: { command: 'opciones' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__opciones__ofrecer' } }))
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__then__offer' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('store.get', () => ({ value: undefined }))
   on('clock.now', () => ({ value: 1000 }))
@@ -193,7 +193,7 @@ test('the color option paints the band', { options: { color: 'custom', customCol
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__opciones__ofrecer', options: OPTIONS } as never)
+  await $.tool.call({ tool: 'mcp__then__offer', options: OPTIONS } as never)
   const ui = await $.ui.mount(BAND as never)
   const pill = await ui.find({ type: 'Text', text: /^ 1 $/ })
   expect((pill as unknown as { props: { backgroundColor: string } }).props.backgroundColor).toBe('#d97757')
