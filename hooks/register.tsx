@@ -10,6 +10,10 @@ const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
 // the colour `/then color …` picked: a palette name or a #RRGGBB; null keeps the one in /config
 const color = atom({ plugin: 'then', key: 'color' } as const, null)
 const STORE_COLOR = 'color'
+// the band's theme `/then tema …` picked: «usage» paints each row by what it spends, «color» all in one colour
+const bandTheme = atom({ plugin: 'then', key: 'theme' } as const, null)
+const STORE_THEME = 'theme'
+const THEMES = ['usage', 'color']
 const STORE_ON = 'isOn'
 const STORE_SOUND = 'sound'
 const COUNT = 4
@@ -22,6 +26,7 @@ type Words = {
   title: string; hint: string; hintFree: string; hintMulti: string; badge: string; column: string; usage: Record<Usage, string>
   free: string; freeDetail: string; writing: string; writingDetail: string; option: string; off: string; on: string; command: string
   argumentHint: string; help: string; colors: Record<string, string>; soundOn: string; soundOff: string
+  themes: Record<string, string>; themeSet: (name: string) => string; themeList: (current: string) => string
   colorList: (current: string) => string; colorSet: (name: string) => string; colorBad: (arg: string) => string; colorReset: string
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
@@ -33,10 +38,13 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
     off: 'Then apagado. /then lo prende de nuevo.', on: 'Then prendido: al final de cada turno vas a ver 4 opciones para elegir con un número.',
     command: 'Prender o apagar las opciones al final de cada turno, o cambiar su color',
-    argumentHint: '[color <nombre|#RRGGBB>] | sonido on|off | on | off',
-    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757 · /then sonido off',
+    argumentHint: '[color <nombre|#RRGGBB>] | tema consumo|color | sonido on|off | on | off',
+    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757 · /then tema consumo · /then sonido off',
     soundOn: 'Then suena al terminar cada turno con opciones. /then sonido off lo calla.',
     soundOff: 'Then ya no suena. /then sonido on lo vuelve a prender.',
+    themes: { usage: 'consumo', color: 'color' },
+    themeSet: n => (n === 'consumo' ? 'Tema consumo: cada fila toma el color de lo que gasta.' : 'Tema color: todas las filas en el color de /then color.'),
+    themeList: c => `Tema de Then: ${c}. /then tema consumo pinta cada fila por lo que gasta; /then tema color las pinta todas en un color.`,
     colors: { blue: 'azul', violet: 'violeta', green: 'verde', amber: 'ámbar', pink: 'rosa', cyan: 'cian' },
     colorList: c => `Color de Then: ${c}. Para cambiarlo: /then color azul | violeta | verde | ámbar | rosa | cian, o /then color #RRGGBB (por ejemplo #D97757). /then color normal vuelve al de /config.`,
     colorSet: c => `Then ahora es ${c}. La banda ya se dibuja con ese color.`,
@@ -51,10 +59,13 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
     off: 'Then is off. /then turns it back on.', on: 'Options on: each turn ends with 4 to pick by number.',
     command: 'Turn the options at the end of each turn on or off, or change their color',
-    argumentHint: '[color <name|#RRGGBB>] | sound on|off | on | off',
-    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757 · /then sound off',
+    argumentHint: '[color <name|#RRGGBB>] | theme usage|color | sound on|off | on | off',
+    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757 · /then theme usage · /then sound off',
     soundOn: 'Then chimes when a turn ends with options. /then sound off mutes it.',
     soundOff: 'Then is muted. /then sound on turns the chime back on.',
+    themes: { usage: 'usage', color: 'color' },
+    themeSet: n => (n === 'usage' ? 'Usage theme: each row takes the color of what it spends.' : 'Color theme: every row in the /then color.'),
+    themeList: c => `Then's theme: ${c}. /then theme usage paints each row by what it spends; /then theme color paints them all in one color.`,
     colors: { blue: 'blue', violet: 'violet', green: 'green', amber: 'amber', pink: 'pink', cyan: 'cyan' },
     colorList: c => `Then is ${c}. To change it: /then color blue | violet | green | amber | pink | cyan, or /then color #RRGGBB (e.g. #D97757). /then color default goes back to /config.`,
     colorSet: c => `Then is now ${c}. The band draws in it right away.`,
@@ -137,6 +148,9 @@ const fitText = (s: string, w: number) => (s.length <= w ? s.padEnd(w) : `${s.sl
 // how much an option would spend: a three-cell meter in plan-progress's done, waiting and error hues, the lighter
 // set where they sit on a dark strip
 const USAGES: Usage[] = ['none', 'low', 'medium', 'high']
+// a row's own colour under the usage theme: plan-progress's grey, done, waiting and error hues at one lightness,
+// each with white text at 4.5:1 or better
+const USAGE_BASE: Record<Usage, number[]> = { none: [107, 106, 115], low: [24, 136, 58], medium: [173, 100, 0], high: [197, 53, 62] }
 const USAGE_COLOR: Record<'dark' | 'light', Record<Usage, string>> = {
   dark: { none: '#A7A5AE', low: '#4FA569', medium: '#C0883B', high: '#D67278' },
   light: { none: '#5B5B5E', low: '#157632', medium: '#905300', high: '#B13038' },
@@ -289,6 +303,7 @@ async function pressPick($: EngineInterface, n: number) {
 
 export const register: Register = (on, options) => {
   const picked = pickAccent(options?.color, options?.customColor)
+  const configTheme = options?.theme === 'color' ? 'color' : 'usage'
   const configColor = options?.color === 'custom' ? String(options?.customColor ?? '') : String(options?.color ?? 'blue')
   languageSetting = String(options?.language ?? 'auto')
   ACCENT = picked.accent
@@ -316,6 +331,8 @@ export const register: Register = (on, options) => {
     const rows = await $.config.list().catch(() => [])
     T = WORDS_BY[languageOf(languageSetting, rows.find(row => row.key === 'language')?.value)]
     await $.command.register({ name: 'then', description: T.command, argumentHint: T.argumentHint })
+    const storedTheme = await $.store.get(STORE_THEME)
+    if (typeof storedTheme === 'string' && THEMES.includes(storedTheme)) await update($, bandTheme, () => storedTheme)
     const storedColor = await $.store.get(STORE_COLOR)
     if (typeof storedColor === 'string' && parseColor(storedColor)) await update($, color, () => storedColor)
     isSoundOn = (await $.store.get(STORE_SOUND)) !== false
@@ -443,6 +460,13 @@ export const register: Register = (on, options) => {
       await $.store.set(STORE_COLOR, chosen)
       return { text: T.colorSet(nameOf(chosen)) }
     }
+    if (word === 'theme' || word === 'tema') {
+      const asked = { consumo: 'usage', usage: 'usage', uso: 'usage', color: 'color', colour: 'color' }[arg.toLowerCase()]
+      if (!asked) return { text: T.themeList(T.themes[(await read($, bandTheme)) ?? configTheme] ?? configTheme) }
+      await update($, bandTheme, () => asked)
+      await $.store.set(STORE_THEME, asked)
+      return { text: T.themeSet(T.themes[asked] ?? asked) }
+    }
     if (word === 'sound' || word === 'sonido') {
       isSoundOn = !/^(off|apagar|no)$/i.test(arg)
       await $.store.set(STORE_SOUND, isSoundOn)
@@ -507,15 +531,26 @@ export const register: Register = (on, options) => {
     const star = hex(isLight ? mix(ACCENT, [0, 0, 0], 0.15) : mix(ACCENT, [255, 255, 255], 0.45))
     // the free row's pill is the accent faded into the strip until it is chosen: it is the band's, not an option
     const freePill = o.isFree ? accent() : hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, 0.5))
-    type Row = { n: number; title: string; detail: string; pill: string; isSuggested: boolean; usage?: Usage; hasTrail: boolean }
+    type Row = { n: number; title: string; detail: string; pill?: string; isSuggested: boolean; usage?: Usage; hasTrail: boolean }
     const marks = await read($, selected)
+    const isUsageTheme = ((await read($, bandTheme)) ?? configTheme) === 'usage'
+    const base = isLight ? LIGHT_BG : DARK_BG
+    // the star is gold whatever the theme, so the suggested row stands out on any strip
+    const gold = isLight ? '#9A6A00' : '#F2C14E'
     // a marked row: the strip lit halfway to the accent and its box ticked white
     const markedBg = hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, isLight ? 0.3 : 0.45))
     // an empty box: a square a shade off the strip, so it reads as something to tick
     const boxBg = hex(mix(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, isLight ? 0.12 : 0.2), isLight ? [0, 0, 0] : [255, 255, 255], isLight ? 0.12 : 0.16))
     const row = (r: Row) => {
       const isMarked = marks?.includes(r.n) ?? false
-      const bg = isMarked ? markedBg : stripBg
+      // under the usage theme an option takes the colour of what it spends; the free row and the colour theme keep the accent
+      const own = isUsageTheme && r.usage && r.n !== FREE ? USAGE_BASE[r.usage] : null
+      const rowAccent = own ?? ACCENT
+      const bg = isMarked ? (own ? hex(mix(base, own, isLight ? 0.3 : 0.45)) : markedBg) : own ? hex(mix(base, own, isLight ? 0.12 : 0.2)) : stripBg
+      const pill = r.pill ?? hex(rowAccent)
+      const pillInk = own ? '#FFFFFF' : INK
+      const rowDots = own ? hex(mix(base, own, isLight ? 0.45 : 0.55)) : dots()
+      const badgeText = isBadgeShort ? (r.isSuggested ? ' ★' : '  ') : ` ${r.isSuggested ? T.badge : ' '.repeat(T.badge.length)}`
       const detail = detailW >= 10 ? fitText(r.detail, detailW) : ''
       // the trail takes what the detail leaves: TRAIL cells beside a full one, the whole gap beside none
       const trailW = Math.max(0, W - (fixed - TRAIL) - detail.length)
@@ -533,23 +568,26 @@ export const register: Register = (on, options) => {
                 <Text key="tras-casilla"> </Text>,
               ]}
           <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}>
-            <Text color={INK} backgroundColor={r.pill} weight="bold">{` ${r.n} `}</Text>
+            <Text color={pillInk} backgroundColor={pill} weight="bold">{` ${r.n} `}</Text>
             <Text backgroundColor={bg}> </Text>
             <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
-            {hasBadge ? (
-              <Text color={r.isSuggested ? star : bg} backgroundColor={bg} weight="semibold">{isBadgeShort ? (r.isSuggested ? ' ★' : '  ') : ` ${r.isSuggested ? T.badge : ' '.repeat(T.badge.length)}`}</Text>
-            ) : (
-              ''
-            )}
-            <Text backgroundColor={bg}>{'  '}</Text>
           </Button>
+          {/* the suggested star twinkles in a Client of its own where the surface runs one; elsewhere it is plain gold */}
+          {!hasBadge ? null : r.isSuggested && Client ? (
+            <Client key={`estrella-${o.at}-${r.n}`} module="./estrella.tsx" props={{ text: badgeText, bg, dim: hex(mix(base, [242, 193, 78], 0.4)) }} width={badgeText.length} />
+          ) : (
+            <Text color={r.isSuggested ? gold : bg} backgroundColor={bg} weight="semibold">
+              {badgeText}
+            </Text>
+          )}
+          <Text backgroundColor={bg}>{'  '}</Text>
           {detail && Client ? (
             // keyed by the offer too, so a new offer starts a fresh instance rather than scrolling the last one's text
             <Client key={`detalle-${o.at}-${r.n}`} module="./detalle.tsx" props={{ text: r.detail, width: detail.length, color: dim, bg }} width={detail.length} />
           ) : (
             <Text color={dim} backgroundColor={bg}>{detail}</Text>
           )}
-          <Text color={dots()} backgroundColor={bg}>{r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}</Text>
+          <Text color={rowDots} backgroundColor={bg}>{r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}</Text>
           {hasMeter ? (
             <Text color={r.usage ? USAGE_COLOR[isLight ? 'light' : 'dark'][r.usage] : bg} backgroundColor={bg}>{` ${r.usage ? (isMeterShort ? meter(r.usage).slice(0, 3) : meter(r.usage)) : ' '.repeat(meterW - 1)}`}</Text>
           ) : null}
@@ -574,7 +612,7 @@ export const register: Register = (on, options) => {
           </Box>
         ) : null}
         {o.options.map((op, i) =>
-          row({ n: i + 1, title: op.title, detail: op.detail, pill: accent(), isSuggested: o.suggested === i + 1, usage: op.usage, hasTrail: true }),
+          row({ n: i + 1, title: op.title, detail: op.detail, isSuggested: o.suggested === i + 1, usage: op.usage, hasTrail: true }),
         )}
         {row({ n: FREE, title: free.title, detail: free.detail, pill: freePill, isSuggested: false, hasTrail: false })}
       </Box>

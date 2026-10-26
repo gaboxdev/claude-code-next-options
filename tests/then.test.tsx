@@ -54,14 +54,20 @@ test('the band draws the four options and a typed pick reaches the model', { opt
   // five rows, and a box beside each of the four options
   expect((await ui.findAll({ type: 'Button' })).length).toBe(9)
   // one star, on the suggested row; a meter on each option that says what it spends, blank on the others
-  expect((await ui.findAll({ type: 'Text', text: /★ sugerida/ })).length).toBe(1)
-  expect((await ui.find({ type: 'Button', key: 'opcion-btn-2' }))?.text).toContain('★ sugerida')
+  // the star twinkles in a Client of its own, on the suggested row alone
+  expect((await ui.findAll({ type: 'Client' })).filter(c => String((c as unknown as { key?: string }).key ?? '').startsWith('estrella')).length).toBe(1)
+  expect(String((await ui.find({ type: 'Client', key: 'estrella-1000-2' }) as unknown as { props: { props: { text: string } } })?.props.props.text)).toContain('★ sugerida')
   expect((await ui.find({ type: 'Box', key: 'opcion-2' }))?.text).toContain('▮▮▯ medio')
   expect((await ui.find({ type: 'Box', key: 'opcion-1' }))?.text).toContain('▮▯▯ bajo')
   expect((await ui.find({ type: 'Box', key: 'opcion-4' }))?.text).not.toContain('▮')
-  // each detail scrolls in a Client of its own, as wide as every other, so the columns line up
-  expect((await ui.findAll({ type: 'Client' })).length).toBe(5)
-  const widths = await Promise.all([1, 2, 3, 4, 5].map(async n => [...((await ui.find({ type: 'Box', key: `opcion-${n}` }))?.text ?? '')].length))
+  // each detail scrolls in a Client of its own, as wide as every other, so the columns line up; the suggested
+  // row's star is one more
+  expect((await ui.findAll({ type: 'Client' })).length).toBe(6)
+  // the star draws its own text, so the suggested row counts its cells by the width it was given
+  const starW = Number(((await ui.find({ type: 'Client', key: 'estrella-1000-2' })) as unknown as { props: { width: number } }).props.width)
+  const widths = await Promise.all(
+    [1, 2, 3, 4, 5].map(async n => [...((await ui.find({ type: 'Box', key: `opcion-${n}` }))?.text ?? '')].length + (n === 2 ? starW : 0)),
+  )
   expect(new Set(widths).size).toBe(1)
   // the meter column says what it is, and the band's own row 5 is there with no meter
   expect((await ui.find({ type: 'Text', text: /consumo/ }))?.text.trim()).toBe('consumo ▾')
@@ -200,7 +206,7 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
   await ui.unmount()
 })
 
-test('the color option paints the band', { options: { color: 'custom', customColor: '#D97757', language: 'english' } }, async ($, on) => {
+test('the color option paints the band', { options: { theme: 'color', color: 'custom', customColor: '#D97757', language: 'english' } }, async ($, on) => {
   on('command.register', () => ({ value: { command: 'then' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.step', async function* (_, e) {
@@ -227,7 +233,7 @@ test('the color option paints the band', { options: { color: 'custom', customCol
   await ui.unmount()
 })
 
-test('/then color changes the band at once, in either language', { options: { language: 'español' } }, async ($, on) => {
+test('/then color changes the band at once, in either language', { options: { language: 'español', theme: 'color' } }, async ($, on) => {
   const stored: Record<string, unknown> = {}
   on('command.register', () => ({ value: { command: 'then' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -396,4 +402,77 @@ test('every option row has a box beside its number; ticking one starts picking s
   const again = await $.ui.mount(BAND as never)
   expect((await again.find({ type: 'Button', key: 'casilla-2' }))?.text).toContain('✓')
   await again.unmount()
+})
+
+test('the usage theme, the default, paints each row by what it spends; /then tema color goes back to one colour', { options: { language: 'español' } }, async ($, on) => {
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('command.run', () => ({ text: 'engine' }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await offer($, block([
+    { title: 'Correr las pruebas', usage: 'low' },
+    { title: 'Subir mis cambios', usage: 'med' },
+    { title: 'Escribir un chequeo', usage: 'high' },
+    { title: 'Dejarlo así', usage: 'none' },
+  ], 2))
+  const pillOf = async (ui: { find: (q: unknown) => Promise<unknown> }, n: number) =>
+    ((await ui.find({ type: 'Text', text: new RegExp(`^ ${n} $`) })) as { props: { backgroundColor: string } }).props.backgroundColor
+  const ui = await $.ui.mount(BAND as never)
+  expect([await pillOf(ui, 1), await pillOf(ui, 2), await pillOf(ui, 3), await pillOf(ui, 4)]).toEqual(['#18883a', '#ad6400', '#c5353e', '#6b6a73'])
+  await ui.unmount()
+
+  const run = (args: string) => $.command.run({ command: 'then', args } as never) as Promise<{ text: string }>
+  expect((await run('tema color')).text).toContain('Tema color')
+  const again = await $.ui.mount(BAND as never)
+  expect([await pillOf(again, 1), await pillOf(again, 3)]).toEqual(['#2b74aa', '#2b74aa'])
+  await again.unmount()
+  expect((await run('tema')).text).toContain('Tema de Then: color')
+})
+
+test('the suggested star twinkles on a clock of its own', { options: { language: 'español' } }, async ($, on) => {
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('store.get', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await offer($, block(OPTIONS, 2))
+  const ui = (await $.ui.mount(BAND as never)) as unknown as {
+    find: (q: unknown) => Promise<{ text: string; props: { color: string } } | undefined>
+    advance: (ms: number) => Promise<void>
+    unmount: () => Promise<void>
+  }
+  const key = 'estrella-1000-2'
+  const colors: string[] = []
+  for (let i = 0; i < 4; i++) {
+    const star = await ui.find({ type: 'Text', in: key })
+    expect(star?.text).toContain('★ sugerida')
+    colors.push(star?.props.color ?? '')
+    await ui.advance(420)
+  }
+  // bright, warm, dim, warm: at least three shades in one round
+  expect(new Set(colors).size).toBe(3)
+  await ui.unmount()
 })

@@ -4,6 +4,6 @@ export type Offer = { title: string; options: Option[]; at: number; suggested?: 
 
 declare module 'claude-code' {
   interface PluginState {
-    then: { offer: Offer | null; isOn: boolean; color: string | null; selected: number[] | null }
+    then: { offer: Offer | null; isOn: boolean; color: string | null; selected: number[] | null; theme: string | null }
   }
 }

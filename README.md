@@ -26,8 +26,8 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 - **Or say it.** `the 3`, `2 and 4`, `2 but skip the tests` + Enter also work (Spanish too: `quiero la 3`, `la 2 y la 4`).
 - **Several at once.** Tick the box beside each number you want, or type `+` and then the numbers (`+4 2`); the boxes fill as you go, and Enter sends them in that order.
 - **Option 5 is free.** Type `5` and the band stays while you write your own request.
-- **★ suggested** marks the one Claude recommends.
-- **usage** shows what each option would spend in tokens and time: none, low, med, high.
+- **★ suggested** marks the one Claude recommends, twinkling in gold.
+- **usage** shows what each option would spend in tokens and time: none, low, med, high. With the default **usage theme** each row takes that color too: grey, green, amber, red.
 - **Fits any width.** In a narrow terminal the band gives up the detail, then the words (the ★ and the bars stay), and every row still lines up.
 - **Hover a long description** and it scrolls so you can read all of it (terminal fullscreen mode or the desktop app).
 - **A soft chime** when a turn ends with options, so you can look away while Claude works (`/then sound off` mutes it).
@@ -43,7 +43,16 @@ At the prompt of a Claude Code session:
 
 Answer `y` to add the marketplace, then pick the user scope. It works from the next turn on.
 
-## Change the color
+## Theme and color
+
+Two themes: **usage** (the default) paints each row by what it spends; **color** paints every row in one color.
+
+```
+/then theme usage      → grey, green, amber, red by usage
+/then theme color      → all rows in the color below
+```
+
+The color (header and boxes, and every row under the color theme):
 
 Type it at the prompt; the band repaints at once and the choice is remembered:
 
@@ -61,6 +70,7 @@ Everything else lives in `/config`, under the plugin (`/then color` wins over th
 | Option | Values | Default |
 |---|---|---|
 | Language | `auto`, `español`, `english` | `auto` (follows Claude Code's language setting) |
+| Theme | `usage`, `color` | `usage` |
 | Band color | `blue`, `violet`, `green`, `amber`, `pink`, `cyan`, `custom` | `blue` |
 | Custom color | any `#RRGGBB` | `#D97757` |
 
@@ -108,8 +118,8 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 - **O dilo.** `quiero la 3`, `la 2 y la 4`, `2 pero sin commit` + Enter también sirven.
 - **Varias a la vez.** Marca la casilla al lado de cada número que quieras, o escribe `+` y luego los números (`+4 2`); las casillas se llenan mientras eliges, y Enter las manda en ese orden.
 - **La 5 es libre.** Escribe `5` y la banda se queda mientras escribes lo tuyo.
-- **★ sugerida** marca la que Claude recomienda.
-- **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto.
+- **★ sugerida** marca la que Claude recomienda, y titila en dorado.
+- **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto. Con el **tema consumo** (el de por defecto) cada fila toma ese color: gris, verde, ámbar, rojo.
 - **Se adapta al ancho.** En una terminal angosta la banda suelta el detalle y luego las palabras (quedan la ★ y las barras), y las filas siguen alineadas.
 - **Pasa el mouse sobre una descripción larga** y se desplaza para leerla entera (modo pantalla completa de la terminal o la app de escritorio).
 - **Suena suave** cuando un turno termina con opciones, para que puedas mirar otra cosa mientras Claude trabaja (`/then sonido off` lo calla).
@@ -123,6 +133,8 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 Responde `y` para agregar el mercado y elige el alcance de usuario.
 
 ### Ajustes
+
+**Tema:** `/then tema consumo` (por defecto, cada fila según lo que gasta) o `/then tema color` (todas en un color).
 
 **Cambiar el color**, escribiéndolo en el prompt (se ve al instante y se recuerda):
 
