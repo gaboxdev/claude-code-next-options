@@ -1,0 +1,45 @@
+{
+  "name": "opciones",
+  "version": "0.2.0",
+  "description": "Ends every Claude Code turn with 4 numbered next steps above the prompt (plus a free one): type 1-5 and go. Shows the suggested one and what each would spend. / Cuatro opciones para seguir al final de cada turno: escribes el número y listo.",
+  "author": {
+    "name": "Gabriel Mendoza",
+    "url": "https://github.com/gaboxdev"
+  },
+  "license": "MIT",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language / Idioma",
+      "description": "What the band is written in; auto follows Claude Code's language setting / En qué idioma se dibuja la banda; auto sigue el idioma de Claude Code",
+      "options": [
+        "auto",
+        "español",
+        "english"
+      ],
+      "default": "auto"
+    },
+    "color": {
+      "type": "string",
+      "title": "Band color / Color de la banda",
+      "description": "Pills, header and the strip of each option / Pastillas, encabezado y franja de cada opción",
+      "options": [
+        "blue",
+        "violet",
+        "green",
+        "amber",
+        "pink",
+        "cyan",
+        "custom"
+      ],
+      "default": "blue"
+    },
+    "customColor": {
+      "type": "string",
+      "title": "Custom color (#RRGGBB) / Color personalizado",
+      "description": "Used when the band color is custom, e.g. #D97757 / Se usa cuando el color es custom",
+      "default": "#D97757"
+    }
+  },
+  "types": "./types/index.d.ts"
+}
