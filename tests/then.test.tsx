@@ -51,7 +51,8 @@ test('the band draws the four options and a typed pick reaches the model', { opt
 
   const ui = await $.ui.mount(BAND as never)
   expect((await ui.find({ type: 'Text', text: /Probar en el navegador/ }))?.text.trim()).toBe('Probar en el navegador')
-  expect((await ui.findAll({ type: 'Button' })).length).toBe(5)
+  // five rows, and a box beside each of the four options
+  expect((await ui.findAll({ type: 'Button' })).length).toBe(9)
   // one star, on the suggested row; a meter on each option that says what it spends, blank on the others
   expect((await ui.findAll({ type: 'Text', text: /★ sugerida/ })).length).toBe(1)
   expect((await ui.find({ type: 'Button', key: 'opcion-btn-2' }))?.text).toContain('★ sugerida')
@@ -343,18 +344,56 @@ test('+ picks several: the rows mark as the numbers are typed, Enter sends them 
   expect(draft).toBe('+4 2')
   expect(sent.length).toBe(0)
   const ui = await $.ui.mount(BAND as never)
-  expect(await ui.find({ type: 'Text', text: /varias: escribe los números/ })).not.toBe(undefined)
+  expect(await ui.find({ type: 'Text', text: /varias: marca las casillas/ })).not.toBe(undefined)
   expect((await ui.find({ type: 'Box', key: 'opcion-4' }))?.text).toContain('✓')
   expect((await ui.find({ type: 'Box', key: 'opcion-2' }))?.text).toContain('✓')
   expect((await ui.find({ type: 'Box', key: 'opcion-1' }))?.text).not.toContain('✓')
-  // a click on a row adds it to the draft
-  await ui.press({ key: 'opcion-btn-3' } as never)
+  // a click on a row's box adds it to the draft, and a second one takes it out
+  await ui.press({ key: 'casilla-3' } as never)
   expect(filled.at(-1)).toBe('+4 2 3')
+  await ui.press({ key: 'casilla-4' } as never)
+  expect(filled.at(-1)).toBe('+2 3')
   await ui.unmount()
+  draft = '+4 2'
 
   await $.prompt.submit({ text: draft, wait: false, origin: { kind: 'composer' } } as never)
   const ctx = sent[0]?.context?.join(' ') ?? ''
   expect(ctx).toContain('options 4 and 2, in that order')
   expect(ctx).toContain('Dejarlo así')
   expect(ctx).toContain('Commitear lo propio')
+})
+
+test('every option row has a box beside its number; ticking one starts picking several', { options: { language: 'español' } }, async ($, on) => {
+  const filled: string[] = []
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('prompt.fill', (_, e) => {
+    filled.push((e as { text: string }).text)
+    return { isFilled: true, text: (e as { text: string }).text, cursor: 0 }
+  })
+  on('store.get', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await offer($, block(OPTIONS, 2))
+  const ui = await $.ui.mount(BAND as never)
+  // rows 1 to 4 carry a box, the free row none
+  for (const n of [1, 2, 3, 4]) expect(await ui.find({ type: 'Button', key: `casilla-${n}` })).not.toBe(undefined)
+  expect(await ui.find({ type: 'Button', key: 'casilla-5' })).toBe(undefined)
+  expect(await ui.find({ type: 'Text', text: /casilla o \+ para varias/ })).not.toBe(undefined)
+  await ui.press({ key: 'casilla-2' } as never)
+  expect(filled.at(-1)).toBe('+2')
+  await ui.unmount()
+  const again = await $.ui.mount(BAND as never)
+  expect((await again.find({ type: 'Button', key: 'casilla-2' }))?.text).toContain('✓')
+  await again.unmount()
 })

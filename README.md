@@ -7,7 +7,7 @@
 Every time Claude finishes a turn, it leaves **4 numbered next steps above the prompt**, plus a fifth one that is yours to write. Type the number and it goes. No more "what should I do next?" at the end of every answer.
 
 ```
-◆ What next?   type the number · + to pick several
+◆ What next?   type the number · box or + for several
                                                                         usage ▾
   1  Test it in the browser               open the page and check it    ▮▯▯ low
   2  Commit my own files     ★ suggested  only this session's files     ▮▮▯ med
@@ -18,7 +18,7 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 
 - **One keystroke.** With the prompt empty, type `3` and option 3 is sent at once, no Enter.
 - **Or say it.** `the 3`, `2 and 4`, `2 but skip the tests` + Enter also work (Spanish too: `quiero la 3`, `la 2 y la 4`).
-- **Several at once.** Type `+` and then the numbers (`+4 2`): each row gets a ✓ as you type (or click rows), and Enter sends them in that order.
+- **Several at once.** Tick the box beside each number you want, or type `+` and then the numbers (`+4 2`); the boxes fill as you go, and Enter sends them in that order.
 - **Option 5 is free.** Type `5` and the band stays while you write your own request.
 - **★ suggested** marks the one Claude recommends.
 - **usage** shows what each option would spend in tokens and time: none, low, med, high.
@@ -93,7 +93,7 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 
 - **Una tecla.** Con el prompt vacío, escribe `3` y la opción 3 sale al instante, sin Enter.
 - **O dilo.** `quiero la 3`, `la 2 y la 4`, `2 pero sin commit` + Enter también sirven.
-- **Varias a la vez.** Escribe `+` y luego los números (`+4 2`): cada fila se marca con ✓ mientras escribes (o haz clic en las filas), y Enter las manda en ese orden.
+- **Varias a la vez.** Marca la casilla al lado de cada número que quieras, o escribe `+` y luego los números (`+4 2`); las casillas se llenan mientras eliges, y Enter las manda en ese orden.
 - **La 5 es libre.** Escribe `5` y la banda se queda mientras escribes lo tuyo.
 - **★ sugerida** marca la que Claude recomienda.
 - **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto.

@@ -26,8 +26,8 @@ type Words = {
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
   es: {
-    title: '¿Cómo seguimos?', hint: 'escribe el número · + para elegir varias', hintFree: 'escribe tu pedido y Enter',
-    hintMulti: 'varias: escribe los números (o haz clic) y Enter',
+    title: '¿Cómo seguimos?', hint: 'escribe el número · casilla o + para varias', hintFree: 'escribe tu pedido y Enter',
+    hintMulti: 'varias: marca las casillas o escribe los números, y Enter',
     badge: '★ sugerida', column: 'consumo ▾', usage: { none: 'nada', low: 'bajo', medium: 'medio', high: 'alto' },
     free: 'Otra cosa (libre)', freeDetail: 'ninguna de estas: escribe lo que quieras',
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
@@ -44,8 +44,8 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     colorReset: 'Then vuelve al color de /config.',
   },
   en: {
-    title: 'What next?', hint: 'type the number · + to pick several', hintFree: 'type your request and Enter',
-    hintMulti: 'several: type the numbers (or click) and Enter',
+    title: 'What next?', hint: 'type the number · box or + for several', hintFree: 'type your request and Enter',
+    hintMulti: 'several: tick the boxes or type the numbers, then Enter',
     badge: '★ suggested', column: 'usage ▾', usage: { none: 'none', low: 'low', medium: 'med', high: 'high' },
     free: 'Something else', freeDetail: 'none of these: type your own',
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
@@ -485,7 +485,9 @@ export const register: Register = (on, options) => {
     const hasBadge = o.suggested != null
     const hasMeter = o.options.some(op => op.usage)
     // pill, gap, title, the badge column, gap, detail, trail, meter, end
-    const fixed = 3 + 1 + titleW + (hasBadge ? 1 + T.badge.length : 0) + 2 + TRAIL + (hasMeter ? 1 + METER_W : 0) + 1
+    // the checkbox and its gap lead every row
+    const BOX_W = 3
+    const fixed = BOX_W + 1 + 3 + 1 + titleW + (hasBadge ? 1 + T.badge.length : 0) + 2 + TRAIL + (hasMeter ? 1 + METER_W : 0) + 1
     const detailW = W - fixed
     const stripBg = tint()
     const ink = isLight ? '#222226' : '#F0EEFC'
@@ -496,8 +498,10 @@ export const register: Register = (on, options) => {
     const freePill = o.isFree ? accent() : hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, 0.5))
     type Row = { n: number; title: string; detail: string; pill: string; isSuggested: boolean; usage?: Usage; hasTrail: boolean }
     const marks = await read($, selected)
-    // a marked row: the strip lit halfway to the accent, its pill turned white, a check where the trail was
+    // a marked row: the strip lit halfway to the accent and its box ticked white
     const markedBg = hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, isLight ? 0.3 : 0.45))
+    // an empty box: a square a shade off the strip, so it reads as something to tick
+    const boxBg = hex(mix(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, isLight ? 0.12 : 0.2), isLight ? [0, 0, 0] : [255, 255, 255], isLight ? 0.12 : 0.16))
     const row = (r: Row) => {
       const isMarked = marks?.includes(r.n) ?? false
       const bg = isMarked ? markedBg : stripBg
@@ -506,8 +510,19 @@ export const register: Register = (on, options) => {
       const trailW = Math.max(0, W - (fixed - TRAIL) - detail.length)
       return (
         <Box key={`opcion-${r.n}`} flexDirection="row" marginLeft={2}>
+          {r.n === FREE
+            ? [<Text key="sin-casilla">{' '.repeat(BOX_W + 1)}</Text>]
+            : [
+                // its own Button beside the row's: a click ticks it and enters the several mode, or unticks it
+                <Button key={`casilla-${r.n}`} label={`${isMarked ? '✓' : '☐'} ${r.n}`} plain onPress={() => toggleRow($, r.n)}>
+                  <Text color={isMarked ? accent() : INK} backgroundColor={isMarked ? '#FFFFFF' : boxBg} weight="bold">
+                    {isMarked ? ' ✓ ' : '   '}
+                  </Text>
+                </Button>,
+                <Text key="tras-casilla"> </Text>,
+              ]}
           <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}>
-            <Text color={isMarked ? accent() : INK} backgroundColor={isMarked ? '#FFFFFF' : r.pill} weight="bold">{` ${r.n} `}</Text>
+            <Text color={INK} backgroundColor={r.pill} weight="bold">{` ${r.n} `}</Text>
             <Text backgroundColor={bg}> </Text>
             <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
             {hasBadge ? (
@@ -523,9 +538,7 @@ export const register: Register = (on, options) => {
           ) : (
             <Text color={dim} backgroundColor={bg}>{detail}</Text>
           )}
-          <Text color={isMarked ? '#FFFFFF' : dots()} backgroundColor={bg} weight={isMarked ? 'bold' : undefined}>
-            {isMarked ? fitText(' ✓', trailW) : r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}
-          </Text>
+          <Text color={dots()} backgroundColor={bg}>{r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}</Text>
           {hasMeter ? (
             <Text color={r.usage ? USAGE_COLOR[isLight ? 'light' : 'dark'][r.usage] : bg} backgroundColor={bg}>{` ${r.usage ? meter(r.usage) : ' '.repeat(METER_W)}`}</Text>
           ) : null}
