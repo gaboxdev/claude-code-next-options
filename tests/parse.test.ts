@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { parseBlock, parsePick, stripBlock } from '../hooks/register'
+import { parseBlock, parsePick, rowsOf, stripBlock } from '../hooks/register'
 
 test('what counts as a pick', () => {
   expect(parsePick('3')).toEqual({ picks: [3], rest: '' })
@@ -39,4 +39,12 @@ test('the <then> block: read, and cut from what is drawn', () => {
   expect(stripBlock('Hecho.\n\n<then>\n1|Correr')).toBe('Hecho.')
   expect(stripBlock('Hecho.\n\n<th')).toBe('Hecho.')
   expect(stripBlock('a <thing> stays')).toBe('a <thing> stays')
+})
+
+test('rowsOf counts a drawn tree as the terminal lays it out', () => {
+  const text = (s: string) => ({ type: 'Text', children: [s] })
+  expect(rowsOf(text('a'))).toBe(1)
+  expect(rowsOf({ type: 'Box', props: { flexDirection: 'column', gap: 1 }, children: [text('a'), text('b'), text('c')] })).toBe(5)
+  expect(rowsOf({ type: 'Box', props: { flexDirection: 'row' }, children: [text('a'), { type: 'Raster', props: { rows: 3 } }] })).toBe(3)
+  expect(rowsOf({ type: 'Box', props: { display: 'none' }, children: [text('a')] })).toBe(0)
 })

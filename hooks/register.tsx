@@ -144,6 +144,22 @@ function trail(width: number, row: number): string {
   }
   return s
 }
+// the rows a drawn tree takes as the terminal lays it out: a Text or a Button one, a Raster its rows, a column the sum
+// of its children and gaps, a row its tallest child. An estimate (no wrapping counted), enough to budget the band
+export function rowsOf(node: unknown): number {
+  if (!node || typeof node !== 'object') return 0
+  const el = node as { type?: string; props?: Record<string, unknown>; children?: unknown[] }
+  const p = el.props ?? {}
+  if (el.type === 'Raster') return Number(p.rows ?? 1)
+  if (el.type === 'Client') return Number(p.height ?? 1)
+  if (el.type !== 'Box') return 1
+  if (p.display === 'none' || p.position === 'absolute') return 0
+  const kids = (el.children ?? []).filter(k => k && typeof k === 'object')
+  const around = ['marginTop', 'marginBottom', 'paddingTop', 'paddingBottom'].reduce((n, k) => n + Number(p[k] ?? 0), 0)
+  if (p.flexDirection === 'column') return kids.reduce((n: number, k) => n + rowsOf(k), 0) + Number(p.gap ?? p.rowGap ?? 0) * Math.max(0, kids.length - 1) + around
+  return Math.max(kids.length > 0 ? 1 : 0, ...kids.map(rowsOf)) + around
+}
+
 const fitText = (s: string, w: number) => (s.length <= w ? s.padEnd(w) : `${s.slice(0, Math.max(0, w - 1)).trimEnd()}…`.padEnd(w))
 // how much an option would spend: a three-cell meter in plan-progress's done, waiting and error hues, the lighter
 // set where they sit on a dark strip
@@ -488,6 +504,17 @@ export const register: Register = (on, options) => {
     isBandShown = false
     if (!o || e.props.hasSurvey || e.props.isWorking || !(await read($, isOn))) return next(e)
     isBandShown = true
+    // what the host and the plugins after this one draw here stays, under the options; asked first, so the band
+    // can size itself to the rows left. A band taller than its room scrolls, and the options under the fold are the
+    // ones nobody sees: it gives up the meter's heading first, then the free row, then its header line, and the four
+    // options stay (5 still picks the free row from the keyboard)
+    const below = await next(e)
+    // something under the band costs its rows and the gap before it; an empty drawing costs nothing and is left out
+    const belowRows = below ? rowsOf(below) : 0
+    const room = (e.props.maxRows || 24) - (belowRows > 0 ? belowRows + 1 : 0)
+    const showHeader = room >= 5
+    const showFree = room >= 6
+    const showColumn = room >= 7
     // the colour `/then color` picked wins over /config; reading it here redraws the band when it changes
     const chosen = await read($, color)
     const painted = chosen ? accentOf(chosen) : picked
@@ -597,6 +624,7 @@ export const register: Register = (on, options) => {
     }
     const tree = (
       <Box flexDirection="column">
+        {showHeader ? (
         <Box flexDirection="row" gap={1}>
           <Text color={accent()}>◆</Text>
           <Text color={INK} backgroundColor={accent()} weight="semibold">{` ${o.title} `}</Text>
@@ -604,7 +632,8 @@ export const register: Register = (on, options) => {
           <Box flexGrow={1} />
           {hasClicks ? <Button key="then-cerrar" plain dimColor label="✕" onPress={() => clear($)} /> : null}
         </Box>
-        {hasMeter ? (
+        ) : null}
+        {hasMeter && showColumn ? (
           // the meter column's own heading, right over it, so the bars read as what each option spends
           <Box key="then-columnas" flexDirection="row" marginLeft={2}>
             <Text>{' '.repeat(Math.max(0, W - meterW))}</Text>
@@ -614,13 +643,11 @@ export const register: Register = (on, options) => {
         {o.options.map((op, i) =>
           row({ n: i + 1, title: op.title, detail: op.detail, isSuggested: o.suggested === i + 1, usage: op.usage, hasTrail: true }),
         )}
-        {row({ n: FREE, title: free.title, detail: free.detail, pill: freePill, isSuggested: false, hasTrail: false })}
+        {showFree || o.isFree ? row({ n: FREE, title: free.title, detail: free.detail, pill: freePill, isSuggested: false, hasTrail: false }) : null}
       </Box>
     )
-    // what the host and the plugins after this one draw here stays, under the options
-    const below = await next(e)
 
-    return below ? (
+    return belowRows > 0 ? (
       <Box flexDirection="column" gap={1}>
         {tree}
         {below}

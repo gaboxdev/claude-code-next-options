@@ -28,7 +28,7 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 - **Option 5 is free.** Type `5` and the band stays while you write your own request.
 - **★ suggested** marks the one Claude recommends, twinkling in gold.
 - **usage** shows what each option would spend in tokens and time: none, low, med, high. With the default **usage theme** each row takes that color too: grey, green, amber, red.
-- **Fits any width.** In a narrow terminal the band gives up the detail, then the words (the ★ and the bars stay), and every row still lines up.
+- **Fits any size.** In a narrow terminal the band gives up the detail, then the words (the ★ and the bars stay), and every row still lines up. In a short one it gives up the meter's heading, then the free row, then its header, so the four options never hide behind a scroll.
 - **Hover a long description** and it scrolls so you can read all of it (terminal fullscreen mode or the desktop app).
 - **A soft chime** when a turn ends with options, so you can look away while Claude works (`/then sound off` mutes it).
 - **Forgot?** If Claude ends a turn of real work without options, the mod sends it back once to add them.
@@ -120,7 +120,7 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 - **La 5 es libre.** Escribe `5` y la banda se queda mientras escribes lo tuyo.
 - **★ sugerida** marca la que Claude recomienda, y titila en dorado.
 - **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto. Con el **tema consumo** (el de por defecto) cada fila toma ese color: gris, verde, ámbar, rojo.
-- **Se adapta al ancho.** En una terminal angosta la banda suelta el detalle y luego las palabras (quedan la ★ y las barras), y las filas siguen alineadas.
+- **Se adapta al tamaño.** En una terminal angosta la banda suelta el detalle y luego las palabras (quedan la ★ y las barras), y las filas siguen alineadas. En una baja suelta el rótulo de consumo, luego la fila libre y luego su encabezado, para que las 4 opciones nunca queden escondidas detrás de un scroll.
 - **Pasa el mouse sobre una descripción larga** y se desplaza para leerla entera (modo pantalla completa de la terminal o la app de escritorio).
 - **Suena suave** cuando un turno termina con opciones, para que puedas mirar otra cosa mientras Claude trabaja (`/then sonido off` lo calla).
 
