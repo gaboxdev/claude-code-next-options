@@ -25,6 +25,8 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 - **One keystroke.** With the prompt empty, type `3` and option 3 is sent at once, no Enter.
 - **Or say it.** `the 3`, `2 and 4`, `2 but skip the tests` + Enter also work (Spanish too: `quiero la 3`, `la 2 y la 4`).
 - **Several at once.** Tick the box beside each number you want, or type `+` and then the numbers (`+4 2`); the boxes fill as you go, and Enter sends them in that order.
+- **Keyboard all the way.** `ctrl+x tab` puts the band on the keyboard, the ring on the suggested row: `↑↓` move, `Enter` picks, `x` ticks a row, `e` sends the ticked ones.
+- **Missed it?** `/then again` brings the last options back.
 - **Option 5 is free.** Type `5` and the band stays while you write your own request.
 - **★ suggested** marks the one Claude recommends, twinkling in gold.
 - **usage** shows what each option would spend in tokens and time: none, low, med, high. With the default **usage theme** each row takes that color too: grey, green, amber, red.
@@ -117,6 +119,8 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 - **Una tecla.** Con el prompt vacío, escribe `3` y la opción 3 sale al instante, sin Enter.
 - **O dilo.** `quiero la 3`, `la 2 y la 4`, `2 pero sin commit` + Enter también sirven.
 - **Varias a la vez.** Marca la casilla al lado de cada número que quieras, o escribe `+` y luego los números (`+4 2`); las casillas se llenan mientras eliges, y Enter las manda en ese orden.
+- **Todo con el teclado.** `ctrl+x tab` le pasa el teclado a la banda, con la sugerida seleccionada: `↑↓` para moverte, `Enter` elige, `x` marca una fila y `e` manda las marcadas.
+- **¿Se fue?** `/then otra vez` vuelve a mostrar las últimas opciones.
 - **La 5 es libre.** Escribe `5` y la banda se queda mientras escribes lo tuyo.
 - **★ sugerida** marca la que Claude recomienda, y titila en dorado.
 - **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto. Con el **tema consumo** (el de por defecto) cada fila toma ese color: gris, verde, ámbar, rojo.

@@ -121,7 +121,7 @@ test('a bare digit in the empty composer picks at once', { options: { language: 
   const r = await edit({ origin: { kind: 'composer' }, text: '', cursor: 0, start: 0, end: 0, inputText: '2' } as never)
   expect(r.text).toBe('')
   // the pick is submitted after the key is consumed
-  for (let i = 0; i < 50 && sent.length === 0; i++) await Promise.resolve()
+  for (let i = 0; i < 2000 && sent.length === 0; i++) await Promise.resolve()
   expect(sent[0]).toContain('Opción 2: Commitear lo propio')
   await ui.unmount()
 })

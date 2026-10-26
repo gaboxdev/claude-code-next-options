@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Offer, Option, Usage } from '../types'
+import type { Offer, Option, PlanBar, Usage } from '../types'
 
 const offer = atom({ plugin: 'then', key: 'offer' } as const, null)
 // the rows marked while the composer holds a `+` pick («+2 4»); null outside that mode
@@ -10,6 +10,13 @@ const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
 // the colour `/then color …` picked: a palette name or a #RRGGBB; null keeps the one in /config
 const color = atom({ plugin: 'then', key: 'color' } as const, null)
 const STORE_COLOR = 'color'
+// the row the band's focus ring is on while it holds the keyboard (ctrl+x tab); null otherwise
+const focused = atom({ plugin: 'then', key: 'focused' } as const, null)
+// the last offer the person answered or set aside, for `/then otra vez`
+const lastOffer = atom({ plugin: 'then', key: 'last' } as const, null)
+// plan-progress's bars, read to leave them room when they sit above the band
+const planBars = atom({ plugin: 'plan-progress', key: 'plans' } as const, [])
+const planOpen = atom({ plugin: 'plan-progress', key: 'isOpen' } as const, true)
 // the band's theme `/then tema …` picked: «usage» paints each row by what it spends, «color» all in one colour
 const bandTheme = atom({ plugin: 'then', key: 'theme' } as const, null)
 const STORE_THEME = 'theme'
@@ -27,21 +34,24 @@ type Words = {
   free: string; freeDetail: string; writing: string; writingDetail: string; option: string; off: string; on: string; command: string
   argumentHint: string; help: string; colors: Record<string, string>; soundOn: string; soundOff: string
   themes: Record<string, string>; themeSet: (name: string) => string; themeList: (current: string) => string
+  keys: string; mark: string; send: string; options: string; again: string; noLast: string
   colorList: (current: string) => string; colorSet: (name: string) => string; colorBad: (arg: string) => string; colorReset: string
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
   es: {
-    title: '¿Cómo seguimos?', hint: 'escribe el número · casilla o + para varias', hintFree: 'escribe tu pedido y Enter',
+    title: '¿Cómo seguimos?', hint: 'escribe el número · casilla o + para varias · ctrl+x tab: teclado', hintFree: 'escribe tu pedido y Enter',
     hintMulti: 'varias: marca las casillas o escribe los números, y Enter',
     badge: '★ sugerida', column: 'consumo ▾', usage: { none: 'nada', low: 'bajo', medium: 'medio', high: 'alto' },
     free: 'Otra cosa (libre)', freeDetail: 'ninguna de estas: escribe lo que quieras',
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
     off: 'Then apagado. /then lo prende de nuevo.', on: 'Then prendido: al final de cada turno vas a ver 4 opciones para elegir con un número.',
     command: 'Prender o apagar las opciones al final de cada turno, o cambiar su color',
-    argumentHint: '[color <nombre|#RRGGBB>] | tema consumo|color | sonido on|off | on | off',
-    help: 'Uso: /then (prende o apaga) · /then color (ver colores) · /then color violeta · /then color #D97757 · /then tema consumo · /then sonido off',
+    argumentHint: '[otra vez] | color <nombre|#RRGGBB> | tema consumo|color | sonido on|off | on | off',
+    help: 'Uso: /then (prende o apaga) · /then otra vez · /then color (ver colores) · /then color violeta · /then color #D97757 · /then tema consumo · /then sonido off',
     soundOn: 'Then suena al terminar cada turno con opciones. /then sonido off lo calla.',
     soundOff: 'Then ya no suena. /then sonido on lo vuelve a prender.',
+    keys: '↑↓ mover · Enter elige', mark: 'marcar', send: 'enviar', options: 'Opciones',
+    again: 'Ahí están otra vez las últimas opciones.', noLast: 'Todavía no hay opciones que volver a mostrar.',
     themes: { usage: 'consumo', color: 'color' },
     themeSet: n => (n === 'consumo' ? 'Tema consumo: cada fila toma el color de lo que gasta.' : 'Tema color: todas las filas en el color de /then color.'),
     themeList: c => `Tema de Then: ${c}. /then tema consumo pinta cada fila por lo que gasta; /then tema color las pinta todas en un color.`,
@@ -52,17 +62,19 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     colorReset: 'Then vuelve al color de /config.',
   },
   en: {
-    title: 'What next?', hint: 'type the number · box or + for several', hintFree: 'type your request and Enter',
+    title: 'What next?', hint: 'type the number · box or + for several · ctrl+x tab: keyboard', hintFree: 'type your request and Enter',
     hintMulti: 'several: tick the boxes or type the numbers, then Enter',
     badge: '★ suggested', column: 'usage ▾', usage: { none: 'none', low: 'low', medium: 'med', high: 'high' },
     free: 'Something else', freeDetail: 'none of these: type your own',
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
     off: 'Then is off. /then turns it back on.', on: 'Options on: each turn ends with 4 to pick by number.',
     command: 'Turn the options at the end of each turn on or off, or change their color',
-    argumentHint: '[color <name|#RRGGBB>] | theme usage|color | sound on|off | on | off',
-    help: 'Usage: /then (on/off) · /then color (list colors) · /then color violet · /then color #D97757 · /then theme usage · /then sound off',
+    argumentHint: '[again] | color <name|#RRGGBB> | theme usage|color | sound on|off | on | off',
+    help: 'Usage: /then (on/off) · /then again · /then color (list colors) · /then color violet · /then color #D97757 · /then theme usage · /then sound off',
     soundOn: 'Then chimes when a turn ends with options. /then sound off mutes it.',
     soundOff: 'Then is muted. /then sound on turns the chime back on.',
+    keys: '↑↓ move · Enter picks', mark: 'tick', send: 'send', options: 'Options',
+    again: 'The last options are back.', noLast: 'No options to bring back yet.',
     themes: { usage: 'usage', color: 'color' },
     themeSet: n => (n === 'usage' ? 'Usage theme: each row takes the color of what it spends.' : 'Color theme: every row in the /then color.'),
     themeList: c => `Then's theme: ${c}. /then theme usage paints each row by what it spends; /then theme color paints them all in one color.`,
@@ -287,8 +299,46 @@ function chime($: EngineInterface) {
 }
 
 async function clear($: EngineInterface) {
+  const o = await read($, offer)
+  if (o) await update($, lastOffer, () => ({ ...o, isFree: false }))
   await update($, offer, () => null)
   await update($, selected, () => null)
+  await update($, focused, () => null)
+}
+
+// the rows plan-progress's bars take above the band: a row a bar, one more for a note it shows, one an agent strip,
+// and the gap before the band. 0 where it is not installed, its bars are hidden, or its state cannot be read
+async function planRowsAbove($: EngineInterface): Promise<number> {
+  try {
+    if (!(await read($, planOpen))) return 0
+    const bars = (await read($, planBars)) as PlanBar[]
+    if (!Array.isArray(bars) || bars.length === 0) return 0
+    const live = (b: PlanBar) => (b.isFolded ? 0 : Math.min(5, (b.agents ?? []).filter(a => a.state === 'running' || a.state === 'waiting').length))
+    return bars.reduce((n, b) => n + 1 + (b.note && b.state !== 'running' ? 1 : 0) + live(b), 0) + 1
+  } catch {
+    return 0
+  }
+}
+
+// where the focus ring lands on the way through the band: one stop a row, the row's own Button. Moving onto a row's
+// box from the row below (the ring was on that row) means going up, so it lands on the row above
+export function ringStop(element: string, at: string | null): string {
+  const box = /^casilla-(\d)$/.exec(element)
+  if (!box) return element
+  const n = Number(box[1])
+  return at === `opcion-btn-${n}` ? `opcion-btn-${Math.max(1, n - 1)}` : `opcion-btn-${n}`
+}
+let ringAt: string | null = null
+
+// the ticked rows, sent as the person's own message in the order they were ticked
+async function sendMarks($: EngineInterface) {
+  const o = await read($, offer)
+  const marks = (await read($, selected)) ?? []
+  const chosen = marks.filter(n => o?.options[n - 1])
+  if (!o || chosen.length === 0) return
+  await clear($)
+  const list = chosen.map(n => `${n}. ${(o.options[n - 1] as Option).title}`).join(' · ')
+  await $.prompt.submit({ text: `${T.options} ${chosen.join(', ')}: ${list}`, asUser: true })
 }
 
 // the numbers a `+` draft marks, in the order typed: «+2 4» → [2, 4]
@@ -360,16 +410,19 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // the hooks that sit in a chain (a setting, the focus, a tool call, a prompt, the stop) fail open: if one of them
+  // throws, the event goes on as if Then were not there
   on('config.set', { key: 'theme' }, async ($, e, next) => {
     const r = await next(e)
     if (r.deny === undefined) isLight = /light/i.test(String(r.value))
 
     return r
-  })
+  }).catch(($, e, next) => next(e))
 
   // a bare digit typed into the empty composer while the band is up picks that option at once, no Enter; the band's
   // Buttons carry no hotkey, which would draw its own "1:" in front of the pill
   on('prompt.edit', async ($, e, next) => {
+    if ((await read($, focused)) !== null) await update($, focused, () => null)
     // a draft that starts with `+` picks several: the digits typed after it mark their rows, Enter sends them all
     const draft = e.text.slice(0, e.start) + e.inputText + e.text.slice(e.end)
     const isMulti = isBandShown && draft.trimStart().startsWith('+')
@@ -394,6 +447,17 @@ export const register: Register = (on, options) => {
 
     return { sections: [...result.sections, { id: 'then:rules', text: RULES, scope: 'session' as const }] }
   })
+
+  on('ui.focus', async ($, e, next) => {
+    // only this band's own elements; a plugin left unnamed is read as ours when the key is one of our rows
+    if (e.component !== 'AbovePrompt' || !e.element || (e.plugin ?? 'then') !== 'then') return next(e)
+    const element = e.origin.kind === 'person' ? ringStop(e.element, ringAt) : e.element
+    ringAt = element
+    const row = /^opcion-btn-(\d)$/.exec(element)
+    await update($, focused, () => (row ? Number(row[1]) : null))
+
+    return next({ ...e, element })
+  }).catch(($, e, next) => next(e))
 
   // the main loop's reply is read once it is in: a <then> block becomes the band
   on('turn.step', async function* ($, e, next) {
@@ -428,7 +492,7 @@ export const register: Register = (on, options) => {
     }
 
     return next(e)
-  })
+  }).catch(($, e, next) => next(e))
 
   // a number typed in the composer while an offer is up becomes that option; anything else just moves on
   on('prompt.submit', async ($, e, next) => {
@@ -442,7 +506,7 @@ export const register: Register = (on, options) => {
     if (pick.picks.includes(FREE) && !pick.rest) return next(e)
 
     return next({ ...e, context: [...(e.context ?? []), pickContext(o, pick.picks, pick.rest)] })
-  })
+  }).catch(($, e, next) => next(e))
 
   // a turn that did work and ended without options is sent back once to offer them
   on('classic.Stop', async ($, e, next) => {
@@ -454,7 +518,7 @@ export const register: Register = (on, options) => {
     hasNudged = true
 
     return { ...result, block: `then: end your reply with the <then> block of ${COUNT} options from the rule, and nothing else.` }
-  })
+  }).catch(($, e, next) => next(e))
 
   // `/then` turns it on or off; `/then on|off` says which; `/then color …` lists, sets or resets the band's colour
   on('command.run', { command: 'then' }, async ($, e) => {
@@ -475,6 +539,13 @@ export const register: Register = (on, options) => {
       await update($, color, () => chosen)
       await $.store.set(STORE_COLOR, chosen)
       return { text: T.colorSet(nameOf(chosen)) }
+    }
+    if (/^(otra|again|de)$/.test(word) || /^(otra vez|de nuevo)$/.test(e.args.trim().toLowerCase())) {
+      const last = await read($, lastOffer)
+      if (!last) return { text: T.noLast }
+      const now = await $.clock.now()
+      await update($, offer, () => ({ ...last, at: now, isFree: false }))
+      return { text: T.again }
     }
     if (word === 'theme' || word === 'tema') {
       const asked = { consumo: 'usage', usage: 'usage', uso: 'usage', color: 'color', colour: 'color' }[arg.toLowerCase()]
@@ -511,7 +582,10 @@ export const register: Register = (on, options) => {
     const below = await next(e)
     // something under the band costs its rows and the gap before it; an empty drawing costs nothing and is left out
     const belowRows = below ? rowsOf(below) : 0
-    const room = (e.props.maxRows || 24) - (belowRows > 0 ? belowRows + 1 : 0)
+    // plan-progress drawing above the band (its hook outside this one) leaves its rows out of `below`: they are read
+    // from its state then. Drawing below (inside), they are already in `below`, so they are not counted twice
+    const above = belowRows > 0 ? 0 : await planRowsAbove($)
+    const room = (e.props.maxRows || 24) - (belowRows > 0 ? belowRows + 1 : 0) - above
     const showHeader = room >= 5
     const showFree = room >= 6
     const showColumn = room >= 7
@@ -560,6 +634,8 @@ export const register: Register = (on, options) => {
     const freePill = o.isFree ? accent() : hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, 0.5))
     type Row = { n: number; title: string; detail: string; pill?: string; isSuggested: boolean; usage?: Usage; hasTrail: boolean }
     const marks = await read($, selected)
+    const ring = await read($, focused)
+    const firstStop = o.suggested ?? 1
     const isUsageTheme = ((await read($, bandTheme)) ?? configTheme) === 'usage'
     const base = isLight ? LIGHT_BG : DARK_BG
     // the star is gold whatever the theme, so the suggested row stands out on any strip
@@ -594,7 +670,14 @@ export const register: Register = (on, options) => {
                 </Button>,
                 <Text key="tras-casilla"> </Text>,
               ]}
-          <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}>
+          <Button
+            key={`opcion-btn-${r.n}`}
+            label={`${r.n}. ${r.title}`}
+            plain
+            // ctrl+x tab puts the ring on the suggested row, so Enter picks what Claude recommends
+            {...(r.n === firstStop ? { autoFocus: true as const } : {})}
+            onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}
+          >
             <Text color={pillInk} backgroundColor={pill} weight="bold">{` ${r.n} `}</Text>
             <Text backgroundColor={bg}> </Text>
             <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
@@ -628,7 +711,14 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row" gap={1}>
           <Text color={accent()}>◆</Text>
           <Text color={INK} backgroundColor={accent()} weight="semibold">{` ${o.title} `}</Text>
-          <Text dimColor wrap="truncate">{o.isFree ? T.hintFree : marks ? T.hintMulti : T.hint}</Text>
+          {ring !== null && !o.isFree
+            ? [
+                // with the band holding the keyboard: x ticks the row the ring is on, e sends the ticked ones
+                <Text key="then-teclas" dimColor>{T.keys}</Text>,
+                ring !== FREE ? <Button key="then-marcar" plain hotkey="x" label={T.mark} onPress={() => toggleRow($, ring)} /> : null,
+                marks && marks.length > 0 ? <Button key="then-enviar" plain hotkey="e" label={T.send} onPress={() => sendMarks($)} /> : null,
+              ]
+            : [<Text key="then-ayuda" dimColor wrap="truncate">{o.isFree ? T.hintFree : marks ? T.hintMulti : T.hint}</Text>]}
           <Box flexGrow={1} />
           {hasClicks ? <Button key="then-cerrar" plain dimColor label="✕" onPress={() => clear($)} /> : null}
         </Box>
