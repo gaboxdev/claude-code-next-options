@@ -97,3 +97,44 @@ test('a turn that ends with options writes them to the mailbox, and a pick there
   await clock.advance(2000)
   expect(sent.length).toBe(1)
 })
+
+// the bare session a Stop test needs: no offer stored, the mod on
+function bareSession(on: (name: never, fn: never) => void) {
+  on('store.get' as never, (() => ({ value: undefined })) as never)
+  on('config.list' as never, (() => ({ value: [] })) as never)
+  on('command.register' as never, (() => ({ value: { command: 'then' } })) as never)
+  on('session.start' as never, ((_: unknown, e: { cwd: string }) => ({ cwd: e.cwd })) as never)
+  on('tool.call' as never, (() => ({ result: 'engine' })) as never)
+  on('turn.start' as never, ((_: unknown, e: { turnId: string }) => ({ turnId: e.turnId })) as never)
+  // what answers a stop the mod lets through
+  on('classic.Stop' as never, (() => ({})) as never)
+}
+
+test('work still running in the background does not excuse a turn from its options', { options: { language: 'español' } }, async ($, on) => {
+  bareSession(on as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.turn.start({ turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm run typecheck' } as never)
+  const stop = await $.classic.Stop({
+    stop_hook_active: false,
+    last_assistant_message: 'El typecheck sigue corriendo; te aviso cuando termine.',
+    background_tasks: [{ id: 'b1' }],
+  } as never)
+  expect(String(stop.block)).toContain('<then>')
+})
+
+test('a reply with no tools is sent back too, but a question and an empty stop are not', { options: { language: 'español' } }, async ($, on) => {
+  bareSession(on as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.turn.start({ turnId: 't1' } as never)
+  const answered = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Fue error mío.' } as never)
+  expect(String(answered.block)).toContain('<then>')
+
+  await $.turn.start({ turnId: 't2' } as never)
+  const asked = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: '¿Cuál preferís?' } as never)
+  expect(asked.block).toBeUndefined()
+
+  await $.turn.start({ turnId: 't3' } as never)
+  const empty = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: '' } as never)
+  expect(empty.block).toBeUndefined()
+})

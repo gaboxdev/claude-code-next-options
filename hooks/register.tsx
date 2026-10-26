@@ -517,13 +517,16 @@ export const register: Register = (on, options) => {
     return next({ ...e, context: [...(e.context ?? []), pickContext(o, pick.picks, pick.rest)] })
   }).catch(($, e, next) => next(e))
 
-  // a turn that did work and ended without options is sent back once to offer them. That is decided before the hooks
-  // beneath run: a turn sent back has not ended, so a settings hook (a notifier, a notch) must not hear a stop that is
-  // not one and chime "done" twice. A hook beneath that blocks too is heard on the next stop
+  // a turn that did work or answered something and ended without options is sent back once to offer them. That is
+  // decided before the hooks beneath run: a turn sent back has not ended, so a settings hook (a notifier, a notch) must
+  // not hear a stop that is not one and chime "done" twice. A hook beneath that blocks too is heard on the next stop.
+  // Work still running in the background does not excuse it: "waiting on the build" is a reply too, and skipping it
+  // left the person with no options and only the recap to read
   on('classic.Stop', async ($, e, next) => {
     if (!(await read($, isOn))) return next(e)
-    const isQuiet = e.stop_hook_active || hasOffered || hasAsked || hasNudged || workCalls === 0
-    if (!isQuiet && (e.background_tasks?.length ?? 0) === 0 && !/\?\s*$/.test(e.last_assistant_message ?? '')) {
+    const said = (e.last_assistant_message ?? '').trim()
+    const isQuiet = e.stop_hook_active || hasOffered || hasAsked || hasNudged || (workCalls === 0 && !said)
+    if (!isQuiet && !/[?？]\s*$/.test(said)) {
       hasNudged = true
 
       return { block: `then: end your reply with the <then> block of ${COUNT} options from the rule, and nothing else.` }
