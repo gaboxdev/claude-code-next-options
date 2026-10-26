@@ -4,6 +4,8 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Offer, Option, Usage } from '../types'
 
 const offer = atom({ plugin: 'then', key: 'offer' } as const, null)
+// the rows marked while the composer holds a `+` pick («+2 4»); null outside that mode
+const selected = atom({ plugin: 'then', key: 'selected' } as const, null)
 const isOn = atom({ plugin: 'then', key: 'isOn' } as const, true)
 // the colour `/then color …` picked: a palette name or a #RRGGBB; null keeps the one in /config
 const color = atom({ plugin: 'then', key: 'color' } as const, null)
@@ -17,14 +19,15 @@ const FREE = COUNT + 1
 // every word the band draws, in the two languages it speaks; `language` in /config picks one, auto follows the
 // session's own language setting
 type Words = {
-  title: string; hint: string; hintFree: string; badge: string; column: string; usage: Record<Usage, string>
+  title: string; hint: string; hintFree: string; hintMulti: string; badge: string; column: string; usage: Record<Usage, string>
   free: string; freeDetail: string; writing: string; writingDetail: string; option: string; off: string; on: string; command: string
   argumentHint: string; help: string; colors: Record<string, string>; soundOn: string; soundOff: string
   colorList: (current: string) => string; colorSet: (name: string) => string; colorBad: (arg: string) => string; colorReset: string
 }
 const WORDS_BY: Record<'es' | 'en', Words> = {
   es: {
-    title: '¿Cómo seguimos?', hint: 'escribe el número · o «la 2 y la 4» + Enter', hintFree: 'escribe tu pedido y Enter',
+    title: '¿Cómo seguimos?', hint: 'escribe el número · + para elegir varias', hintFree: 'escribe tu pedido y Enter',
+    hintMulti: 'varias: escribe los números (o haz clic) y Enter',
     badge: '★ sugerida', column: 'consumo ▾', usage: { none: 'nada', low: 'bajo', medium: 'medio', high: 'alto' },
     free: 'Otra cosa (libre)', freeDetail: 'ninguna de estas: escribe lo que quieras',
     writing: '✎ Escribiendo lo tuyo', writingDetail: 'escribe abajo y Enter; me llega tal cual', option: 'Opción',
@@ -41,7 +44,8 @@ const WORDS_BY: Record<'es' | 'en', Words> = {
     colorReset: 'Then vuelve al color de /config.',
   },
   en: {
-    title: 'What next?', hint: 'type the number · or "2 and 4" + Enter', hintFree: 'type your request and Enter',
+    title: 'What next?', hint: 'type the number · + to pick several', hintFree: 'type your request and Enter',
+    hintMulti: 'several: type the numbers (or click) and Enter',
     badge: '★ suggested', column: 'usage ▾', usage: { none: 'none', low: 'low', medium: 'med', high: 'high' },
     free: 'Something else', freeDetail: 'none of these: type your own',
     writing: '✎ Writing your own', writingDetail: 'type below and Enter; sent as is', option: 'Option',
@@ -184,7 +188,7 @@ export function parsePick(text: string): { picks: number[]; rest: string } | nul
   const picks: number[] = []
   let at = 0
   for (; at < tokens.length; at++) {
-    const word = (tokens[at] ?? '').toLowerCase().replace(/^[«"'(]+|[».,;:!?)"'/+&-]+$/g, '')
+    const word = (tokens[at] ?? '').toLowerCase().replace(/^[«"'(+]+|[».,;:!?)"'/+&-]+$/g, '')
     const digits = /^[1-5](?:[,/+&y-][1-5])*$/.test(word) ? word.match(/[1-5]/g)?.map(Number) : undefined
     // a number word counts only in a short message: "y dos cosas más…" is not a pick
     const named = digits ?? (isShort ? WORDS[word] : undefined)
@@ -200,9 +204,11 @@ const joinNumbers = (n: number[]) => (n.length === 1 ? `${n[0]}` : `${n.slice(0,
 const describe = (o: Option) => `«${o.title}»${o.detail ? ` (${o.detail})` : ''}`
 
 function pickContext(o: Offer, picks: number[], rest: string): string {
-  if (picks.includes(FREE)) return `The person passed on the options you offered at the end of your last reply and asked for this instead: «${rest}».`
-  const chosen = picks.map(n => `${n}. ${describe(o.options[n - 1] as Option)}`).join('; ')
-  const head = picks.length === 1 ? `The person picked option ${picks[0]}` : `The person picked options ${joinNumbers(picks)}, in that order`
+  if (picks.includes(FREE) && picks.length === 1) return `The person passed on the options you offered at the end of your last reply and asked for this instead: «${rest}».`
+  // the free row among others adds nothing to pick: what they wrote travels as `rest`
+  const real = picks.filter(n => n !== FREE)
+  const chosen = real.map(n => `${n}. ${describe(o.options[n - 1] as Option)}`).join('; ')
+  const head = real.length === 1 ? `The person picked option ${real[0]}` : `The person picked options ${joinNumbers(real)}, in that order`
   return `${head} of the ones you offered at the end of your last reply: ${chosen}. Do that now.${rest ? ` They added: «${rest}».` : ''}`
 }
 
@@ -252,6 +258,18 @@ function chime($: EngineInterface) {
 
 async function clear($: EngineInterface) {
   await update($, offer, () => null)
+  await update($, selected, () => null)
+}
+
+// the numbers a `+` draft marks, in the order typed: «+2 4» → [2, 4]
+export const draftPicks = (draft: string) => [...new Set((draft.match(/[1-9]/g) ?? []).map(Number))]
+
+// a click on a row while picking several adds or removes its number in the draft, which the band then follows
+async function toggleRow($: EngineInterface, n: number) {
+  const now = (await read($, selected)) ?? []
+  const next = now.includes(n) ? now.filter(x => x !== n) : [...now, n]
+  await update($, selected, () => next)
+  await $.prompt.fill({ text: `+${next.join(' ')}` })
 }
 
 // the free row keeps the band up while the person writes, and a digit then types as a digit
@@ -319,6 +337,15 @@ export const register: Register = (on, options) => {
   // a bare digit typed into the empty composer while the band is up picks that option at once, no Enter; the band's
   // Buttons carry no hotkey, which would draw its own "1:" in front of the pill
   on('prompt.edit', async ($, e, next) => {
+    // a draft that starts with `+` picks several: the digits typed after it mark their rows, Enter sends them all
+    const draft = e.text.slice(0, e.start) + e.inputText + e.text.slice(e.end)
+    const isMulti = isBandShown && draft.trimStart().startsWith('+')
+    if (isMulti || (await read($, selected)) !== null) {
+      const o = await read($, offer)
+      const marks = isMulti && o && !o.isFree ? draftPicks(draft).filter(n => n <= o.options.length || n === FREE) : null
+      await update($, selected, () => marks)
+      if (marks) return next(e)
+    }
     if (!isBandShown || e.text !== '' || !/^[1-9]$/.test(e.inputText)) return next(e)
     const o = await read($, offer)
     const n = Number(e.inputText)
@@ -460,7 +487,7 @@ export const register: Register = (on, options) => {
     // pill, gap, title, the badge column, gap, detail, trail, meter, end
     const fixed = 3 + 1 + titleW + (hasBadge ? 1 + T.badge.length : 0) + 2 + TRAIL + (hasMeter ? 1 + METER_W : 0) + 1
     const detailW = W - fixed
-    const bg = tint()
+    const stripBg = tint()
     const ink = isLight ? '#222226' : '#F0EEFC'
     const dim = isLight ? '#5B5B5E' : '#A7A5AE'
     // the accent lifted toward white on a dark strip, deepened on a light one, so the star reads on either
@@ -468,14 +495,19 @@ export const register: Register = (on, options) => {
     // the free row's pill is the accent faded into the strip until it is chosen: it is the band's, not an option
     const freePill = o.isFree ? accent() : hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, 0.5))
     type Row = { n: number; title: string; detail: string; pill: string; isSuggested: boolean; usage?: Usage; hasTrail: boolean }
+    const marks = await read($, selected)
+    // a marked row: the strip lit halfway to the accent, its pill turned white, a check where the trail was
+    const markedBg = hex(mix(isLight ? LIGHT_BG : DARK_BG, ACCENT, isLight ? 0.3 : 0.45))
     const row = (r: Row) => {
+      const isMarked = marks?.includes(r.n) ?? false
+      const bg = isMarked ? markedBg : stripBg
       const detail = detailW >= 10 ? fitText(r.detail, detailW) : ''
       // the trail takes what the detail leaves: TRAIL cells beside a full one, the whole gap beside none
       const trailW = Math.max(0, W - (fixed - TRAIL) - detail.length)
       return (
         <Box key={`opcion-${r.n}`} flexDirection="row" marginLeft={2}>
-          <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => pressPick($, r.n)}>
-            <Text color={INK} backgroundColor={r.pill} weight="bold">{` ${r.n} `}</Text>
+          <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}>
+            <Text color={isMarked ? accent() : INK} backgroundColor={isMarked ? '#FFFFFF' : r.pill} weight="bold">{` ${r.n} `}</Text>
             <Text backgroundColor={bg}> </Text>
             <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
             {hasBadge ? (
@@ -491,7 +523,9 @@ export const register: Register = (on, options) => {
           ) : (
             <Text color={dim} backgroundColor={bg}>{detail}</Text>
           )}
-          <Text color={dots()} backgroundColor={bg}>{r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}</Text>
+          <Text color={isMarked ? '#FFFFFF' : dots()} backgroundColor={bg} weight={isMarked ? 'bold' : undefined}>
+            {isMarked ? fitText(' ✓', trailW) : r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}
+          </Text>
           {hasMeter ? (
             <Text color={r.usage ? USAGE_COLOR[isLight ? 'light' : 'dark'][r.usage] : bg} backgroundColor={bg}>{` ${r.usage ? meter(r.usage) : ' '.repeat(METER_W)}`}</Text>
           ) : null}
@@ -504,7 +538,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row" gap={1}>
           <Text color={accent()}>◆</Text>
           <Text color={INK} backgroundColor={accent()} weight="semibold">{` ${o.title} `}</Text>
-          <Text dimColor wrap="truncate">{o.isFree ? T.hintFree : T.hint}</Text>
+          <Text dimColor wrap="truncate">{o.isFree ? T.hintFree : marks ? T.hintMulti : T.hint}</Text>
           <Box flexGrow={1} />
           {hasClicks ? <Button key="then-cerrar" plain dimColor label="✕" onPress={() => clear($)} /> : null}
         </Box>

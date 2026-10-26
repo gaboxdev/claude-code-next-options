@@ -18,6 +18,7 @@ test('what counts as a pick', () => {
   expect(parsePick("lets do 2 and 4")).toEqual({ picks: [2, 4], rest: '' })
   expect(parsePick('the third one')).toEqual({ picks: [3, 1], rest: '' })
   expect(parsePick('no, 3 is wrong')).toBe(null)
+  expect(parsePick('+2 4')).toEqual({ picks: [2, 4], rest: '' })
 })
 
 test('the <then> block: read, and cut from what is drawn', () => {

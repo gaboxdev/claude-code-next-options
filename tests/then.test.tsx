@@ -303,3 +303,58 @@ test('the reply is drawn without its block, and a turn with options chimes', { o
   expect((await msg.find({ type: 'Text' }))?.text).toBe('Listo, quedó hecho.')
   await msg.unmount()
 })
+
+test('+ picks several: the rows mark as the numbers are typed, Enter sends them in order', { options: { language: 'español' } }, async ($, on) => {
+  const sent: { text: string; context?: readonly string[] }[] = []
+  const filled: string[] = []
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('prompt.submit', (_, e) => {
+    sent.push({ text: e.text, context: e.context })
+    return { text: e.text, context: e.context }
+  })
+  on('prompt.fill', (_, e) => {
+    filled.push((e as { text: string }).text)
+    return { isFilled: true, text: (e as { text: string }).text, cursor: 0 }
+  })
+  on('prompt.edit', (_, e) => ({ text: e.text.slice(0, e.start) + e.inputText + e.text.slice(e.end), cursor: e.start + e.inputText.length }))
+  on('store.get', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await offer($, block(OPTIONS, 2))
+  const first = await $.ui.mount(BAND as never)
+  await first.unmount()
+  const edit = ($.prompt as unknown as { edit: (e: unknown) => Promise<{ text: string }> }).edit
+  let draft = ''
+  for (const ch of ['+', '4', ' ', '2']) {
+    draft = (await edit({ origin: { kind: 'composer' }, text: draft, cursor: draft.length, start: draft.length, end: draft.length, inputText: ch })).text
+  }
+  // the digits were typed, not picked at once
+  expect(draft).toBe('+4 2')
+  expect(sent.length).toBe(0)
+  const ui = await $.ui.mount(BAND as never)
+  expect(await ui.find({ type: 'Text', text: /varias: escribe los números/ })).not.toBe(undefined)
+  expect((await ui.find({ type: 'Box', key: 'opcion-4' }))?.text).toContain('✓')
+  expect((await ui.find({ type: 'Box', key: 'opcion-2' }))?.text).toContain('✓')
+  expect((await ui.find({ type: 'Box', key: 'opcion-1' }))?.text).not.toContain('✓')
+  // a click on a row adds it to the draft
+  await ui.press({ key: 'opcion-btn-3' } as never)
+  expect(filled.at(-1)).toBe('+4 2 3')
+  await ui.unmount()
+
+  await $.prompt.submit({ text: draft, wait: false, origin: { kind: 'composer' } } as never)
+  const ctx = sent[0]?.context?.join(' ') ?? ''
+  expect(ctx).toContain('options 4 and 2, in that order')
+  expect(ctx).toContain('Dejarlo así')
+  expect(ctx).toContain('Commitear lo propio')
+})
