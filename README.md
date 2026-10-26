@@ -4,6 +4,12 @@
 
 **English** · [Español](#español)
 
+<p align="center">
+  <img src="media/then-en-preview.gif" alt="Then: a band of 4 numbered next steps appears above the Claude Code prompt; pressing 3 picks one, two boxes are ticked to pick several" width="540">
+  <br>
+  <a href="https://github.com/gaboxdev/then/releases/download/v0.8.0/then-en.mp4"><b>▶ Watch the full video with sound (37 s)</b></a>
+</p>
+
 Every time Claude finishes a turn, it leaves **4 numbered next steps above the prompt**, plus a fifth one that is yours to write. Type the number and it goes. No more "what should I do next?" at the end of every answer.
 
 ```
@@ -89,6 +95,12 @@ Made to sit next to [plan-progress](https://github.com/zycck/claude-mods), whose
 ## Español
 
 **Then** es un Claude mod para Claude Code.
+
+<p align="center">
+  <img src="media/then-es-preview.gif" alt="Then: aparece una banda con 4 opciones numeradas encima del prompt de Claude Code; con el 3 se elige una y con dos casillas se eligen varias" width="540">
+  <br>
+  <a href="https://github.com/gaboxdev/then/releases/download/v0.8.0/then-es.mp4"><b>▶ Ver el video completo con sonido (37 s)</b></a>
+</p>
 
 Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir encima del prompt**, más una quinta que escribes tú. Escribes el número y listo.
 
