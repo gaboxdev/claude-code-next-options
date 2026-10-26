@@ -476,19 +476,30 @@ export const register: Register = (on, options) => {
     const Client = 'Client' in els ? els.Client : null
     const hasClicks = e.surface !== 'terminal' || e.viewport?.isFullscreen === true
     // every row is one strip of the same width, so the pills, titles and details line up in columns
-    const W = Math.min(110, Math.max(40, (e.props.bodyColumns || 100) - 4))
+    // the strips span the band less its two columns of margin, from 28 to 110 cells
+    const W = Math.min(110, Math.max(28, (e.props.bodyColumns || 100) - 2))
     const free = o.isFree
       ? { title: T.writing, detail: T.writingDetail }
       : { title: T.free, detail: T.freeDetail }
-    const titleW = Math.min(34, Math.max(free.title.length, ...o.options.map(op => op.title.length)))
-    const TRAIL = 4
+    const maxTitle = Math.min(34, Math.max(free.title.length, ...o.options.map(op => op.title.length)))
     const hasBadge = o.suggested != null
     const hasMeter = o.options.some(op => op.usage)
-    // pill, gap, title, the badge column, gap, detail, trail, meter, end
-    // the checkbox and its gap lead every row
+    // a row is box, gap, pill, gap, title, badge, gap, detail, trail, meter, end. As the band narrows it gives up, in
+    // order: the detail, the dotted trail, the badge's word (the star stays), the meter's word (the bars stay), and
+    // last the title's tail; every row keeps the same columns, so they still line up
     const BOX_W = 3
-    const fixed = BOX_W + 1 + 3 + 1 + titleW + (hasBadge ? 1 + T.badge.length : 0) + 2 + TRAIL + (hasMeter ? 1 + METER_W : 0) + 1
+    let TRAIL = 4
+    let badgeW = hasBadge ? 1 + T.badge.length : 0
+    let meterW = hasMeter ? 1 + METER_W : 0
+    const around = () => BOX_W + 1 + 3 + 1 + badgeW + 2 + TRAIL + meterW + 1
+    if (around() + maxTitle + 10 > W) TRAIL = 0
+    if (around() + maxTitle > W && hasBadge) badgeW = 2
+    if (around() + maxTitle > W && hasMeter) meterW = 4
+    const titleW = Math.max(4, Math.min(maxTitle, W - around()))
+    const fixed = around() + titleW
     const detailW = W - fixed
+    const isBadgeShort = hasBadge && badgeW === 2
+    const isMeterShort = hasMeter && meterW === 4
     const stripBg = tint()
     const ink = isLight ? '#222226' : '#F0EEFC'
     const dim = isLight ? '#5B5B5E' : '#A7A5AE'
@@ -526,7 +537,7 @@ export const register: Register = (on, options) => {
             <Text backgroundColor={bg}> </Text>
             <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
             {hasBadge ? (
-              <Text color={r.isSuggested ? star : bg} backgroundColor={bg} weight="semibold">{` ${r.isSuggested ? T.badge : ' '.repeat(T.badge.length)}`}</Text>
+              <Text color={r.isSuggested ? star : bg} backgroundColor={bg} weight="semibold">{isBadgeShort ? (r.isSuggested ? ' ★' : '  ') : ` ${r.isSuggested ? T.badge : ' '.repeat(T.badge.length)}`}</Text>
             ) : (
               ''
             )}
@@ -540,7 +551,7 @@ export const register: Register = (on, options) => {
           )}
           <Text color={dots()} backgroundColor={bg}>{r.hasTrail ? trail(trailW, r.n) : ' '.repeat(trailW)}</Text>
           {hasMeter ? (
-            <Text color={r.usage ? USAGE_COLOR[isLight ? 'light' : 'dark'][r.usage] : bg} backgroundColor={bg}>{` ${r.usage ? meter(r.usage) : ' '.repeat(METER_W)}`}</Text>
+            <Text color={r.usage ? USAGE_COLOR[isLight ? 'light' : 'dark'][r.usage] : bg} backgroundColor={bg}>{` ${r.usage ? (isMeterShort ? meter(r.usage).slice(0, 3) : meter(r.usage)) : ' '.repeat(meterW - 1)}`}</Text>
           ) : null}
           <Text backgroundColor={bg}> </Text>
         </Box>
@@ -558,8 +569,8 @@ export const register: Register = (on, options) => {
         {hasMeter ? (
           // the meter column's own heading, right over it, so the bars read as what each option spends
           <Box key="then-columnas" flexDirection="row" marginLeft={2}>
-            <Text>{' '.repeat(W - 1 - METER_W)}</Text>
-            <Text color={star} weight="semibold">{T.column.padEnd(METER_W)}</Text>
+            <Text>{' '.repeat(Math.max(0, W - meterW))}</Text>
+            <Text color={star} weight="semibold">{isMeterShort ? ' ▾ ' : ` ${T.column.padEnd(METER_W)}`}</Text>
           </Box>
         ) : null}
         {o.options.map((op, i) =>

@@ -22,6 +22,7 @@ Every time Claude finishes a turn, it leaves **4 numbered next steps above the p
 - **Option 5 is free.** Type `5` and the band stays while you write your own request.
 - **★ suggested** marks the one Claude recommends.
 - **usage** shows what each option would spend in tokens and time: none, low, med, high.
+- **Fits any width.** In a narrow terminal the band gives up the detail, then the words (the ★ and the bars stay), and every row still lines up.
 - **Hover a long description** and it scrolls so you can read all of it (terminal fullscreen mode or the desktop app).
 - **A soft chime** when a turn ends with options, so you can look away while Claude works (`/then sound off` mutes it).
 - **Forgot?** If Claude ends a turn of real work without options, the mod sends it back once to add them.
@@ -97,6 +98,7 @@ Cada vez que Claude termina un turno, deja **4 opciones numeradas para seguir en
 - **La 5 es libre.** Escribe `5` y la banda se queda mientras escribes lo tuyo.
 - **★ sugerida** marca la que Claude recomienda.
 - **consumo** dice cuánto gastaría cada opción en tokens y tiempo: nada, bajo, medio, alto.
+- **Se adapta al ancho.** En una terminal angosta la banda suelta el detalle y luego las palabras (quedan la ★ y las barras), y las filas siguen alineadas.
 - **Pasa el mouse sobre una descripción larga** y se desplaza para leerla entera (modo pantalla completa de la terminal o la app de escritorio).
 - **Suena suave** cuando un turno termina con opciones, para que puedas mirar otra cosa mientras Claude trabaja (`/then sonido off` lo calla).
 
