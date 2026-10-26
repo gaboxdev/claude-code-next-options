@@ -104,11 +104,12 @@ Everything stays local: Then makes **no network requests** and calls no model of
 - **What it sends as you.** Picking an option with a click or a digit submits a message in your name: `Option 3: <title> — <detail>` (`Opción 3: …` in Spanish). Ticking boxes writes `+1 3` into your prompt box; your Enter sends it.
 - **What it adds to your messages.** When you type a pick yourself (`3`, `the 2 and 4`, `+1 3`), it attaches one line of context naming the options you chose, and whatever you wrote after the numbers.
 - **Prompt box.** A lone digit typed into the empty prompt while the band is up picks that option instead of typing it (`prompt.edit`); anything else types as usual.
-- **Tool calls.** It watches the main session's tool calls (`tool.call`) only to count them, so a turn that did work and forgot the options is reminded once (`classic.Stop`). Every call passes on unchanged; Then stands in for no tool.
+- **Tool calls.** It watches the main session's tool calls (`tool.call`) only to count them, so a turn that did work and forgot the options is reminded once (`classic.Stop`). That turn has not ended, so the other Stop hooks are not told it did: they hear the stop that comes back with the options. Every call passes on unchanged; Then stands in for no tool.
 - **Settings.** It reads the terminal theme when it changes (`config.set` on `theme`) to pick light or dark strips, and passes the change on untouched.
 - **Programs it runs.** Only the chime: on macOS the engine's own player; on **Windows**, which has no player for a terminal, `powershell -NoProfile -NonInteractive -Command "(New-Object Media.SoundPlayer 'sounds\listo.wav').PlaySync()"` in the plugin's folder, when a turn ends with options. `/then sound off` stops it. Nothing else is run.
 - **Other plugins.** It reads [plan-progress](https://github.com/zycck/claude-mods)'s bars (`plans`, `isOpen`) to leave them room when they sit above the band. It writes nothing of theirs.
 - **Stored.** Your choices (on/off, sound, color, theme) and the last offer, in Claude Code's own store for the plugin.
+- **Files it writes and reads.** When a turn ends it writes the options to `~/.claude/then/<session>.offer.json` (`{"id": null}` when there are none), so an app beside the terminal can show them, and while they are up it reads `<session>.pick.json` every half second: a pick there with the same `id` is sent as a press on the band would. Onzatchy (the Mac notch) is one such app. The folder is the one beside your Claude Code transcripts.
 
 ## How it works
 
@@ -173,11 +174,12 @@ Todo queda local: Then **no hace peticiones de red** ni llama a ningún modelo p
 - **Lo que envía a tu nombre:** al elegir con un clic o un número, manda un mensaje tuyo: `Opción 3: <título> — <detalle>`. Al marcar casillas escribe `+1 3` en tu prompt; tu Enter lo envía.
 - **Lo que agrega a tus mensajes:** si escribes la elección (`3`, `la 2 y la 4`, `+1 3`), adjunta una línea de contexto con las opciones elegidas y lo que escribiste después.
 - **Prompt:** un número solo, con el prompt vacío y la banda a la vista, elige esa opción en vez de escribirse; todo lo demás se escribe normal.
-- **Llamadas a herramientas:** solo las cuenta, para recordarle a Claude una vez las opciones si las olvidó después de trabajar. Todas pasan sin cambios.
+- **Llamadas a herramientas:** solo las cuenta, para recordarle a Claude una vez las opciones si las olvidó después de trabajar. Todas pasan sin cambios. Ese turno no terminó, así que a los demás hooks de Stop no se les avisa que terminó: se enteran cuando vuelve con las opciones.
 - **Ajustes:** lee el tema de la terminal cuando cambia, para elegir franjas claras u oscuras, y deja pasar el cambio intacto.
 - **Programas que corre:** solo el sonido. En macOS, el reproductor de Claude Code; en **Windows**, que no tiene uno para la terminal, `powershell` con un comando fijo que reproduce `sounds\listo.wav` de la carpeta del plugin. `/then sonido off` lo apaga. Nada más.
 - **Otros plugins:** lee las barras de [plan-progress](https://github.com/zycck/claude-mods) para dejarles espacio cuando están encima de la banda. No escribe nada suyo.
 - **Lo que guarda:** tus ajustes (encendido, sonido, color, tema) y la última oferta, en el almacén de Claude Code para el plugin.
+- **Archivos que escribe y lee:** al terminar un turno escribe las opciones en `~/.claude/then/<sesión>.offer.json` (`{"id": null}` si no hay), para que una app al lado de la terminal las muestre, y mientras siguen arriba lee `<sesión>.pick.json` cada medio segundo: una elección ahí con el mismo `id` se manda como si tocaras la banda. Onzatchy (el notch del Mac) es una de esas apps. La carpeta es la que está al lado de tus transcripts de Claude Code.
 
 ### Cuánto consume
 

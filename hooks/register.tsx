@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { Offer, Option, PlanBar, Usage } from '../types'
 
@@ -300,6 +300,44 @@ async function clear($: EngineInterface) {
   if (o) await update($, lastOffer, () => ({ ...o, isFree: false }))
   await update($, offer, () => null)
   await update($, selected, () => null)
+  if (mailbox) await publish($, mailbox, null)
+}
+
+// ---------- the mailbox: another app on this machine shows the offer and picks from it ----------
+
+// when a turn ends, the offer is also written to <config dir>/then/<session>.offer.json, or `{"id":null}` when there is
+// none; an app beside the terminal (a notch, a menu bar) may show it and write <session>.pick.json `{"id", "pick"}`,
+// which Then reads while the offer is up and sends as a press on the band would. The id is the offer's own, so a pick
+// left from an earlier offer never lands on a new one. Nothing leaves the machine
+let mailbox: string | null = null
+let pickWatch: Timer | null = null
+
+// the session's mailbox, beside its transcript's config dir; null where the path says nothing of one
+export function mailboxOf(transcriptPath: string, sessionId: string): string | null {
+  const dir = /^(.*)[\\/]projects[\\/]/.exec(transcriptPath)?.[1]
+  return dir && /^[\w-]+$/.test(sessionId) ? `${dir}/then/${sessionId}` : null
+}
+
+async function publish($: EngineInterface, base: string, o: Offer | null) {
+  pickWatch?.cancel()
+  pickWatch = null
+  const shown = o && !o.isFree ? o : null
+  const body = shown ? { v: 1, id: shown.at, options: shown.options, suggested: shown.suggested ?? null } : { v: 1, id: null }
+  await $.fs.write(`${base}.offer.json`, JSON.stringify(body)).catch(() => undefined)
+  if (shown) pickWatch = $.clock.every(500, () => void readPick($, base, shown.at))
+}
+
+async function readPick($: EngineInterface, base: string, id: number) {
+  let pick: { id?: unknown; pick?: unknown }
+  try {
+    pick = JSON.parse(await $.fs.read(`${base}.pick.json`))
+  } catch {
+    return
+  }
+  const o = await read($, offer)
+  const n = Number(pick?.pick)
+  if (!o || o.at !== id || pick?.id !== id || !Number.isInteger(n) || n < 1 || n > o.options.length) return
+  await pressPick($, n)
 }
 
 // the rows plan-progress's bars take above the band: a row a bar, one more for a note it shows, one an agent strip,
@@ -472,16 +510,22 @@ export const register: Register = (on, options) => {
     return next({ ...e, context: [...(e.context ?? []), pickContext(o, pick.picks, pick.rest)] })
   }).catch(($, e, next) => next(e))
 
-  // a turn that did work and ended without options is sent back once to offer them
+  // a turn that did work and ended without options is sent back once to offer them. That is decided before the hooks
+  // beneath run: a turn sent back has not ended, so a settings hook (a notifier, a notch) must not hear a stop that is
+  // not one and chime "done" twice. A hook beneath that blocks too is heard on the next stop
   on('classic.Stop', async ($, e, next) => {
-    const result = await next(e)
-    if (!(await read($, isOn))) return result
-    if (e.stop_hook_active || result.block || hasOffered || hasAsked || hasNudged || workCalls === 0) return result
-    if ((e.background_tasks?.length ?? 0) > 0) return result
-    if (/\?\s*$/.test(e.last_assistant_message ?? '')) return result
-    hasNudged = true
+    if (!(await read($, isOn))) return next(e)
+    const isQuiet = e.stop_hook_active || hasOffered || hasAsked || hasNudged || workCalls === 0
+    if (!isQuiet && (e.background_tasks?.length ?? 0) === 0 && !/\?\s*$/.test(e.last_assistant_message ?? '')) {
+      hasNudged = true
 
-    return { ...result, block: `then: end your reply with the <then> block of ${COUNT} options from the rule, and nothing else.` }
+      return { block: `then: end your reply with the <then> block of ${COUNT} options from the rule, and nothing else.` }
+    }
+    // the offer is in the mailbox before the hooks beneath hear the stop, so an app they tell finds it there
+    mailbox = mailboxOf(e.transcript_path, e.session_id) ?? mailbox
+    if (mailbox) await publish($, mailbox, await read($, offer))
+
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   // `/then` turns it on or off; `/then on|off` says which; `/then color …` lists, sets or resets the band's colour
