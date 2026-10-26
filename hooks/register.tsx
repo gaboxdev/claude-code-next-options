@@ -279,13 +279,14 @@ export function parseBlock(text: string): { options: Option[]; suggested: number
 export const stripBlock = (text: string) =>
   text.replace(/\s*<then>[\s\S]*?(?:<\/then>|$)/, '').replace(/\s*<(?:t(?:h(?:e(?:n)?)?)?)?$/, '').trimEnd()
 
-// the chime a turn with options ends on; Windows plays it through its own player, where the engine's can stay silent
+// the chime a turn with options ends on. macOS plays it through the engine (afplay); a Windows terminal has no
+// player of its own, so there it is Windows PowerShell's SoundPlayer: one program, a fixed command, run in the
+// plugin's folder so the file is named by a fixed relative path. Nothing else is ever run
 function chime($: EngineInterface) {
-  const file = `${$.plugin.root}/sounds/listo.wav`
   if (/^[A-Za-z]:/.test($.plugin.root)) {
     void $.process
-      .run(['powershell', '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '(New-Object Media.SoundPlayer $env:THEN_WAV).PlaySync()'], {
-        env: { THEN_WAV: file.replace(/\//g, '\\') },
+      .run(['powershell', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', "(New-Object Media.SoundPlayer 'sounds\\listo.wav').PlaySync()"], {
+        cwd: $.plugin.root,
         timeoutMs: 5000,
       })
       .catch(() => undefined)
@@ -387,11 +388,11 @@ export const register: Register = (on, options) => {
 
   // the hooks that sit in a chain (a setting, a tool call, a prompt, the stop) fail open: if one of them
   // throws, the event goes on as if Then were not there
-  on('config.set', { key: 'theme' }, async ($, e, next) => {
-    const r = await next(e)
-    if (r.deny === undefined) isLight = /light/i.test(String(r.value))
+  // the terminal theme only tells the band light from dark strips; the setting passes on untouched
+  on('config.set', { key: 'theme' }, ($, e, next) => {
+    isLight = /light/i.test(String(e.value))
 
-    return r
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   // a bare digit typed into the empty composer while the band is up picks that option at once, no Enter; the band's

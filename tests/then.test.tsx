@@ -304,6 +304,7 @@ test('the reply is drawn without its block, and a turn with options chimes', { o
   await offer($, block(OPTIONS, 2))
   await $.turn.complete({ turnId: 't1', reason: 'answer', answer: reply } as never)
   expect(played.length).toBe(1)
+  // the engine's player, or on a Windows path the fixed PowerShell command; the sound is the plugin's own file
   expect(played[0]).toContain('listo.wav')
 
   const msg = await $.ui.mount({ plugin: 'then', component: 'AssistantMessage', requestId: 'm1', surface: 'terminal', props: { text: block(OPTIONS, 2), isFirstOfReply: true } } as never)

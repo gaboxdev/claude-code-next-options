@@ -95,6 +95,21 @@ Version 0.4 used a tool for this; moving to the block cut the fixed part in half
 
 `/then off` removes all of it.
 
+## What Then does on your machine
+
+Everything stays local: Then makes **no network requests** and calls no model of its own.
+
+- **System prompt.** It adds one short rule asking Claude to end each reply with a `<then>` block of 4 options (`/then off` removes it).
+- **Replies.** It reads that block when a reply is in (`turn.step`) and draws the band; the transcript shows the reply without the block (`ui.render` on `AssistantMessage` changes only what is drawn; the stored message keeps it, so Claude knows what it offered).
+- **What it sends as you.** Picking an option with a click or a digit submits a message in your name: `Option 3: <title> — <detail>` (`Opción 3: …` in Spanish). Ticking boxes writes `+1 3` into your prompt box; your Enter sends it.
+- **What it adds to your messages.** When you type a pick yourself (`3`, `the 2 and 4`, `+1 3`), it attaches one line of context naming the options you chose, and whatever you wrote after the numbers.
+- **Prompt box.** A lone digit typed into the empty prompt while the band is up picks that option instead of typing it (`prompt.edit`); anything else types as usual.
+- **Tool calls.** It watches the main session's tool calls (`tool.call`) only to count them, so a turn that did work and forgot the options is reminded once (`classic.Stop`). Every call passes on unchanged; Then stands in for no tool.
+- **Settings.** It reads the terminal theme when it changes (`config.set` on `theme`) to pick light or dark strips, and passes the change on untouched.
+- **Programs it runs.** Only the chime: on macOS the engine's own player; on **Windows**, which has no player for a terminal, `powershell -NoProfile -NonInteractive -Command "(New-Object Media.SoundPlayer 'sounds\listo.wav').PlaySync()"` in the plugin's folder, when a turn ends with options. `/then sound off` stops it. Nothing else is run.
+- **Other plugins.** It reads [plan-progress](https://github.com/zycck/claude-mods)'s bars (`plans`, `isOpen`) to leave them room when they sit above the band. It writes nothing of theirs.
+- **Stored.** Your choices (on/off, sound, color, theme) and the last offer, in Claude Code's own store for the plugin.
+
 ## How it works
 
 It is a Claude mod (a Claude Code hooks module). It adds one short rule to the system prompt asking Claude to end each reply with a `<then>` block of 4 lines (`n|title|detail|usage`, a `*` on the suggested one). The mod reads that block when the reply is in, hides it from the transcript (the stored message keeps it, so Claude knows what it offered) and draws the band above the prompt; what you type is read before it reaches Claude, and the option you chose travels with your message as context. Nothing leaves your machine.
@@ -148,6 +163,21 @@ Responde `y` para agregar el mercado y elige el alcance de usuario.
 ```
 
 En `/config` están el idioma (`auto`, `español`, `english`) y el color por defecto. `/then` lo apaga y lo prende (`/then on`, `/then off`) y `/then sonido on|off` maneja el sonido.
+
+### Qué hace Then en tu equipo
+
+Todo queda local: Then **no hace peticiones de red** ni llama a ningún modelo propio.
+
+- **Prompt de sistema:** agrega una regla corta para que Claude cierre cada respuesta con un bloque `<then>` de 4 opciones (`/then off` la quita).
+- **Respuestas:** lee ese bloque al terminar la respuesta y dibuja la banda; la conversación se ve sin el bloque (solo cambia lo que se dibuja; el mensaje guardado lo conserva).
+- **Lo que envía a tu nombre:** al elegir con un clic o un número, manda un mensaje tuyo: `Opción 3: <título> — <detalle>`. Al marcar casillas escribe `+1 3` en tu prompt; tu Enter lo envía.
+- **Lo que agrega a tus mensajes:** si escribes la elección (`3`, `la 2 y la 4`, `+1 3`), adjunta una línea de contexto con las opciones elegidas y lo que escribiste después.
+- **Prompt:** un número solo, con el prompt vacío y la banda a la vista, elige esa opción en vez de escribirse; todo lo demás se escribe normal.
+- **Llamadas a herramientas:** solo las cuenta, para recordarle a Claude una vez las opciones si las olvidó después de trabajar. Todas pasan sin cambios.
+- **Ajustes:** lee el tema de la terminal cuando cambia, para elegir franjas claras u oscuras, y deja pasar el cambio intacto.
+- **Programas que corre:** solo el sonido. En macOS, el reproductor de Claude Code; en **Windows**, que no tiene uno para la terminal, `powershell` con un comando fijo que reproduce `sounds\listo.wav` de la carpeta del plugin. `/then sonido off` lo apaga. Nada más.
+- **Otros plugins:** lee las barras de [plan-progress](https://github.com/zycck/claude-mods) para dejarles espacio cuando están encima de la banda. No escribe nada suyo.
+- **Lo que guarda:** tus ajustes (encendido, sonido, color, tema) y la última oferta, en el almacén de Claude Code para el plugin.
 
 ### Cuánto consume
 
