@@ -32,6 +32,16 @@ test('the <then> block: read, and cut from what is drawn', () => {
     ],
     suggested: 2,
   })
+  // the star is the model's to misplace: wherever it lands on a row, that row is the suggested one, and the field it
+  // was stuck to still reads (a `low*` usage is still low)
+  const rows = (row2: string) => `<then>\n1|Uno|a|low\n${row2}\n3|Tres|c|high\n4|Cuatro|d|none\n</then>`
+  for (const row2 of ['2|Dos|b|low*', '2|Dos|b|low *', '2|Dos*|b|low', '2|Dos|b*|low', '2 *|Dos|b|low', '2|★ Dos|b|low', '*2|Dos|b|low']) {
+    const parsed = parseBlock(rows(row2))
+    expect(parsed?.suggested).toBe(2)
+    expect(parsed?.options[1]).toEqual({ title: 'Dos', detail: 'b', usage: 'low' })
+  }
+  // a star inside the words is not a mark
+  expect(parseBlock(rows('2|Revisar a*b|b|low'))?.suggested).toBe(null)
   expect(parseBlock('no block here')).toBe(null)
   expect(parseBlock('<then>\n1|solo una\n</then>')).toBe(null)
   expect(stripBlock(reply)).toBe('Hecho.')

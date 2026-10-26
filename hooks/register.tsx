@@ -257,20 +257,27 @@ const USAGE_WORDS: Record<string, Usage> = {
   none: 'none', nada: 'none', low: 'low', bajo: 'low', med: 'medium', medium: 'medium', medio: 'medium', high: 'high', alto: 'high',
 }
 
-// the <then> block at the end of a reply: four `n[*]|title|detail|usage` lines; null when there is none or it is not four
+// a star (or ★) at either edge of a field: the model's mark for the suggested row, wherever on the row it lands
+const MARK = /^[*★]+\s*|\s*[*★]+$/g
+
+// the <then> block at the end of a reply: four `n[*]|title|detail|usage` lines; null when there is none or it is not four.
+// The rule puts the star after the number, but a model misplaces it (`low*`, `title*`, `*2`): the row is still the
+// suggested one, and the field it was stuck to still reads, so the person never loses the ★ or a row's meter to it
 export function parseBlock(text: string): { options: Option[]; suggested: number | null } | null {
   const body = BLOCK.exec(text)?.[1]
   if (body === undefined) return null
   const options: Option[] = []
   let suggested: number | null = null
   for (const line of body.split('\n')) {
-    const row = /^\s*[1-9]\s*(\*)?\s*[|.)]\s*(.*)$/.exec(line)
+    const row = /^\s*([*★])?\s*[1-9]\s*([*★])?\s*[|.)]\s*(.*)$/.exec(line)
     if (!row) continue
-    const [title = '', detail = '', usage = ''] = (row[2] ?? '').split('|').map(part => part.trim())
+    const parts = (row[3] ?? '').split('|').map(part => part.trim())
+    const isMarked = Boolean(row[1] || row[2]) || parts.some(part => part.replace(MARK, '') !== part)
+    const [title = '', detail = '', usage = ''] = parts.map(part => part.replace(MARK, ''))
     if (!title) continue
     const u = USAGE_WORDS[usage.toLowerCase()]
     options.push({ title: str(title, 60), detail: str(detail, 110), ...(u ? { usage: u } : {}) })
-    if (row[1]) suggested = options.length
+    if (isMarked) suggested = options.length
   }
   return options.length === COUNT ? { options, suggested } : null
 }
