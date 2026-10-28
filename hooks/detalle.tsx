@@ -1,8 +1,9 @@
 import type { ClientModule } from 'claude-code'
 
-// an option's detail in its column: cut with an ellipsis at rest; under the pointer, a long one scrolls through its
-// whole text and around again, and settles back at its start when the pointer leaves
-type Props = { text: string; width: number; color: string; bg: string }
+// an option's detail or title in its column: cut with an ellipsis at rest; under the pointer, a long one scrolls
+// through its whole text and around again, and settles back at its start when the pointer leaves. A title drawn here
+// sits outside its row's Button (a Button holds Text alone), so a click on it posts `press` and the band picks the row
+type Props = { text: string; width: number; color: string; bg: string; weight?: 'semibold'; press?: number }
 type State = { isOver: boolean; offset: number }
 
 const TICK_MS = 140
@@ -14,11 +15,12 @@ const cut = (s: string, w: number) => (s.length <= w ? s.padEnd(w) : `${s.slice(
 
 const Detalle: ClientModule<Props, State> = (props, surface) => {
   const { Text } = surface.elements
-  const { text, width, color, bg } = props
+  const { text, width, color, bg, weight, press } = props
   if (surface.state === undefined) {
     surface.onPointer(e => {
       if (e.type === 'enter' || (e.type === 'move' && !surface.state?.isOver)) surface.setState({ isOver: true, offset: -PAUSE })
       if (e.type === 'leave') surface.setState({ isOver: false, offset: 0 })
+      if (e.type === 'up' && e.button === 'left' && press !== undefined) surface.post({ press })
     })
     // one clock for the instance's life; it only redraws while the pointer is over a text that does not fit
     surface.every(TICK_MS, () => {
@@ -28,12 +30,12 @@ const Detalle: ClientModule<Props, State> = (props, surface) => {
     surface.setState({ isOver: false, offset: 0 })
   }
   const s = surface.state ?? { isOver: false, offset: 0 }
-  if (!s.isOver || text.length <= width) return <Text color={color} backgroundColor={bg}>{cut(text, width)}</Text>
+  if (!s.isOver || text.length <= width) return <Text color={color} backgroundColor={bg} weight={weight}>{cut(text, width)}</Text>
   const loop = text + GAP
   const at = Math.max(0, s.offset) % loop.length
   const shown = (loop + loop).slice(at, at + width).padEnd(width)
 
-  return <Text color={color} backgroundColor={bg} underline>{shown}</Text>
+  return <Text color={color} backgroundColor={bg} weight={weight} underline>{shown}</Text>
 }
 
 export default Detalle

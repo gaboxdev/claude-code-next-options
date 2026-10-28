@@ -40,9 +40,10 @@ for (const surface of ['terminal', 'desktop'] as const) {
         const row = await ui.find({ type: 'Box', key: `opcion-${n}` })
         const client = await ui.find({ type: 'Client', key: `detalle-1000-${n}` })
         const star = await ui.find({ type: 'Client', key: `estrella-1000-${n}` })
+        const title = await ui.find({ type: 'Client', key: `titulo-1000-${n}` })
         const width = (c: unknown) => Number((c as { props?: { width?: number } } | undefined)?.props?.width ?? 0)
         // a Client draws its own text, so its cells count by the width it was given
-        widths.push([...(row?.text ?? '')].length + width(client) + width(star))
+        widths.push([...(row?.text ?? '')].length + width(client) + width(star) + width(title))
       }
       // two columns of margin on the left, the engine's five on the right are outside bodyColumns already
       expect({ cols, same: new Set(widths).size === 1, fits: Math.max(...widths) <= cols - 2 }).toEqual({ cols, same: true, fits: true })

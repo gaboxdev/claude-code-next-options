@@ -206,6 +206,55 @@ test('a long detail scrolls under the pointer and settles back when it leaves', 
   await ui.unmount()
 })
 
+const LONG_TITLE = 'Un título largo que no cabe entero en su columna'
+
+test('a cut title scrolls under the pointer too, and a click on it still picks its row', { options: { language: 'español' } }, async ($, on) => {
+  const sent: string[] = []
+  on('command.register', () => ({ value: { command: 'then' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: reply, toolUses: [] }
+  })
+  on('prompt.submit', (_, e) => {
+    sent.push(e.text)
+    return { text: e.text }
+  })
+  on('store.get', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('config.list', () => ({ value: [] }))
+  on('tool.call', () => ({ result: 'engine' }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+
+    return <Box />
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await offer($, block([{ title: LONG_TITLE, detail: 'corto' }, ...OPTIONS.slice(1)]))
+  const ui = (await $.ui.mount(BAND as never)) as unknown as Mounted<'terminal', 'AbovePrompt'>
+  // a title that fits stays plain text inside its Button; only the cut one gets a scroller
+  expect(await ui.find({ type: 'Client', key: 'titulo-1000-2' })).toBe(undefined)
+  const key = 'titulo-1000-1'
+  const shown = async () => (await ui.find({ type: 'Text', in: key }))?.text ?? ''
+
+  const atRest = await shown()
+  expect(atRest.trimEnd().endsWith('…')).toBe(true)
+  expect((await ui.find({ type: 'Button', key: 'opcion-btn-1' }))?.text).not.toContain('Un título')
+  await ui.pointer({ type: 'enter', x: 0, y: 0, in: key } as never)
+  await ui.advance(140 * 6 + 140 * 10)
+  const moved = await shown()
+  expect(moved.startsWith(LONG_TITLE.slice(10, 14))).toBe(true)
+  await ui.pointer({ type: 'leave', x: 0, y: 0, in: key } as never)
+  await ui.advance(140)
+  expect(await shown()).toBe(atRest)
+
+  await ui.pointer({ type: 'down', x: 2, y: 0, button: 'left', in: key } as never)
+  await ui.pointer({ type: 'up', x: 2, y: 0, button: 'left', in: key } as never)
+  for (let i = 0; i < 2000 && sent.length === 0; i++) await Promise.resolve()
+  expect(sent[0]).toBe(`Opción 1: ${LONG_TITLE} — corto`)
+  await ui.unmount()
+})
+
 test('the color option paints the band', { options: { theme: 'color', color: 'custom', customColor: '#D97757', language: 'english' } }, async ($, on) => {
   on('command.register', () => ({ value: { command: 'then' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))

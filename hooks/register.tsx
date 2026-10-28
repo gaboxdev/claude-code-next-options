@@ -488,6 +488,14 @@ export const register: Register = (on, options) => {
     return { text: next ? T.on : T.off }
   })
 
+  // a click on a cut title, whose scroller sits outside its row's Button: the same as pressing the row
+  on('ui.message', async ($, e, next) => {
+    const press = (e.data as { press?: unknown } | null)?.press
+    if (!e.element.startsWith('titulo-') || typeof press !== 'number') return next(e)
+    await ((await read($, selected)) ? toggleRow($, press) : pressPick($, press))
+    return {}
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const o = await read($, offer)
     isBandShown = false
@@ -570,6 +578,7 @@ export const register: Register = (on, options) => {
       const pillInk = own ? '#FFFFFF' : INK
       const rowDots = own ? hex(mix(base, own, isLight ? 0.45 : 0.55)) : dots()
       const badgeText = isBadgeShort ? (r.isSuggested ? ' ★' : '  ') : ` ${r.isSuggested ? T.badge : ' '.repeat(T.badge.length)}`
+      const isTitleCut = Client !== null && r.title.length > titleW
       const detail = detailW >= 10 ? fitText(r.detail, detailW) : ''
       // the trail takes what the detail leaves: TRAIL cells beside a full one, the whole gap beside none
       const trailW = Math.max(0, W - (fixed - TRAIL) - detail.length)
@@ -589,8 +598,13 @@ export const register: Register = (on, options) => {
           <Button key={`opcion-btn-${r.n}`} label={`${r.n}. ${r.title}`} plain onPress={() => (marks ? toggleRow($, r.n) : pressPick($, r.n))}>
             <Text color={pillInk} backgroundColor={pill} weight="bold">{` ${r.n} `}</Text>
             <Text backgroundColor={bg}> </Text>
-            <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>
+            {isTitleCut ? null : <Text color={ink} backgroundColor={bg} weight="semibold">{fitText(r.title, titleW)}</Text>}
           </Button>
+          {/* a cut title scrolls under the pointer like the detail; a Button holds Text alone, so it sits beside the
+              pill's and a click on it reaches the band as a `ui.message` */}
+          {isTitleCut && Client ? (
+            <Client key={`titulo-${o.at}-${r.n}`} module="./detalle.tsx" props={{ text: r.title, width: titleW, color: ink, bg, weight: 'semibold', press: r.n }} width={titleW} />
+          ) : null}
           {/* the suggested star twinkles in a Client of its own where the surface runs one; elsewhere it is plain gold */}
           {!hasBadge ? null : r.isSuggested && Client ? (
             <Client key={`estrella-${o.at}-${r.n}`} module="./estrella.tsx" props={{ text: badgeText, bg, dim: hex(mix(base, [242, 193, 78], 0.4)) }} width={badgeText.length} />
