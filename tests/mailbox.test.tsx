@@ -56,13 +56,15 @@ test('a turn that ends with options writes them to the mailbox, and a pick there
   const files: Record<string, string> = {}
   let offerAtStop: string | undefined
   const sent: string[] = []
+  // on Windows the engine hands these hooks the path resolved there (`C:\Users\ana\…`); kept as BASE spells it
+  const key = (p: string) => p.replace(/^[A-Za-z]:/, '').replace(/\\/g, '/')
   on('fs.write', (_, e) => {
-    files[e.path] = e.text
+    files[key(e.path)] = e.text
     return { value: undefined }
   })
   on('fs.read', (_, e) => {
-    if (!(e.path in files)) throw new Error('ENOENT')
-    return { value: files[e.path] }
+    if (!(key(e.path) in files)) throw new Error('ENOENT')
+    return { value: files[key(e.path)] }
   })
   on('classic.Stop', () => {
     offerAtStop = files[`${BASE}.offer.json`]
